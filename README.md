@@ -1,8 +1,9 @@
 # Notman
 
-A GNOME Shell extension that exposes and enforces notification-list policies GNOME
-keeps hidden. Version 1 is scoped to **screenshot notifications**; the engine is
-built as a rule registry so other sources can be added later.
+A GNOME Shell extension (GNOME 46, 47, and 48) that exposes and enforces
+notification-list policies GNOME keeps hidden: compact downscaled screenshot
+thumbnails (~36 KB vs ~32 MiB at 4K), screenshot & screencast controls, global
+Do-Not-Disturb transient-notification expiry, and cross-app retention limits.
 
 ## Why
 
@@ -86,7 +87,7 @@ make             # compile TypeScript into dist/
 make check       # schema, imports, scripts, lint, unit tests, typecheck
 make qa-xvfb     # isolated GNOME Shell 46 smoke test (private Xvfb + D-Bus)
 make dev-install # symlink dist/ into ~/.local/share/gnome-shell/extensions/
-gnome-extensions enable notman@ozy.local
+gnome-extensions enable notman@kbgjtn.github.io
 ```
 
 On X11, reload with `Alt+F2` → `r` (on Wayland, log out and back in). If the
@@ -94,7 +95,7 @@ shell UI becomes unusable, the extension can be disabled over D-Bus without it:
 
 ```sh
 gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.DisableExtension notman@ozy.local
+  --method org.gnome.Shell.Extensions.DisableExtension notman@kbgjtn.github.io
 ```
 
 ## Compatibility

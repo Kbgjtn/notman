@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a bug or unexpected behavior in Notman
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected to happen.
+    validations:
+      required: true
+  - type: input
+    id: gnome-version
+    attributes:
+      label: GNOME Shell version
+      placeholder: e.g. 46.0, 47.2, 48.0
+    validations:
+      required: true
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session type
+      options:
+        - Wayland
+        - X11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or GetStats output
+      description: Output of `journalctl -f -o cat /usr/bin/gnome-shell | grep -i notman` (with Debug logging enabled).
+      render: shell

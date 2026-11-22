@@ -1,4 +1,4 @@
-UUID := notman@ozy.local
+UUID := notman@kbgjtn.github.io
 EXT_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SCHEMA := schemas/org.gnome.shell.extensions.notman.gschema.xml
 STAMP := node_modules/.package-lock.json

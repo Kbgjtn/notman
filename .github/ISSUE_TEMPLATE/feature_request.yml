@@ -1,0 +1,18 @@
+name: Feature request
+description: Suggest a new rule, setting, or improvement for Notman
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What notification annoyance or GNOME limitation would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed behavior
+      description: How should Notman handle it?
+    validations:
+      required: false

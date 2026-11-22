@@ -428,8 +428,12 @@ export default class NotmanPreferences extends ExtensionPreferences {
     });
     addLinkRow(infoGroup, _("Homepage"), baseUrl);
     addLinkRow(infoGroup, _("Release notes"), `${baseUrl}/releases`);
-    addLinkRow(infoGroup, _("Report an issue"), `${baseUrl}/issues/new`);
-    addLinkRow(infoGroup, _("Feature request"), `${baseUrl}/issues/new`);
+    addLinkRow(infoGroup, _("Report an issue"), `${baseUrl}/issues/new?template=bug_report.yml`);
+    addLinkRow(
+      infoGroup,
+      _("Feature request"),
+      `${baseUrl}/issues/new?template=feature_request.yml`,
+    );
     aboutPage.add(infoGroup);
 
     const cleanup = (): void => {

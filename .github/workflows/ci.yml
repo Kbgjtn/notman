@@ -46,6 +46,17 @@ jobs:
       - name: Package the extension
         run: make pack
 
+      - name: Verify package contents
+        run: |
+          LIST="$(unzip -Z1 notman.zip)"
+          for required in metadata.json extension.js prefs.js schemas/gschemas.compiled; do
+            echo "$LIST" | grep -qx "$required" || { echo "Missing $required in notman.zip"; exit 1; }
+          done
+          if echo "$LIST" | grep -qE '(^node_modules/|\.ts$)'; then
+            echo "Unexpected source or node_modules files in notman.zip"
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: notman-extension

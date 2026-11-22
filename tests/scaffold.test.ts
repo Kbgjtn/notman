@@ -9,7 +9,7 @@ describe("scaffold", () => {
   it("pins the verified GNOME version and UUID", () => {
     const metadata = JSON.parse(readFileSync("metadata.json", "utf8"));
     expect(metadata["shell-version"]).toEqual(["46", "47", "48"]);
-    expect(metadata.uuid).toBe("notman@ozy.local");
+    expect(metadata.uuid).toBe("notman@kbgjtn.github.io");
     expect(metadata["settings-schema"]).toBe("org.gnome.shell.extensions.notman");
   });
 

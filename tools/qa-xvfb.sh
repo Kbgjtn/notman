@@ -18,7 +18,7 @@ if [ "${NOTMAN_QA_INNER:-}" != "1" ]; then
   export GSETTINGS_SCHEMA_DIR="$ROOT/dist/schemas"
   mkdir -p "$XDG_DATA_HOME/gnome-shell/extensions" "$XDG_RUNTIME_DIR" "$XDG_PICTURES_DIR"
   chmod 700 "$XDG_RUNTIME_DIR"
-  ln -s "$ROOT/dist" "$XDG_DATA_HOME/gnome-shell/extensions/notman@ozy.local"
+  ln -s "$ROOT/dist" "$XDG_DATA_HOME/gnome-shell/extensions/notman@kbgjtn.github.io"
   exec dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" bash "$0"
 fi
 
@@ -48,8 +48,8 @@ done
 
 for _ in $(seq 1 20); do
   if gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-      --method org.gnome.Shell.Extensions.GetExtensionInfo notman@ozy.local 2>/dev/null \
-      | grep -q "notman@ozy.local"; then
+      --method org.gnome.Shell.Extensions.GetExtensionInfo notman@kbgjtn.github.io 2>/dev/null \
+      | grep -q "notman@kbgjtn.github.io"; then
     break
   fi
   sleep 1
@@ -63,7 +63,7 @@ echo "dnd=$(gsettings get org.gnome.desktop.notifications show-banners) " \
      "save=$(gsettings get org.gnome.desktop.lockdown disable-save-to-disk)"
 
 gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.EnableExtension notman@ozy.local
+  --method org.gnome.Shell.Extensions.EnableExtension notman@kbgjtn.github.io
 
 READY=0
 for _ in $(seq 1 20); do
@@ -78,13 +78,13 @@ done
 if [ "$READY" -ne 1 ]; then
   echo "QA FAIL: extension D-Bus API did not appear" >&2
   gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-    --method org.gnome.Shell.Extensions.GetExtensionInfo notman@ozy.local || true
+    --method org.gnome.Shell.Extensions.GetExtensionInfo notman@kbgjtn.github.io || true
   exit 1
 fi
 
 echo "--- extension errors ---"
 gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.GetExtensionErrors notman@ozy.local
+  --method org.gnome.Shell.Extensions.GetExtensionErrors notman@kbgjtn.github.io
 
 echo "--- stats before ---"
 gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
@@ -172,7 +172,7 @@ fi
 echo "QA OK: transient notification tracked and expired under DND"
 
 ERRORS="$(gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
-  --method org.gnome.Shell.Extensions.GetExtensionErrors notman@ozy.local)"
+  --method org.gnome.Shell.Extensions.GetExtensionErrors notman@kbgjtn.github.io)"
 echo "--- extension errors (final) ---"
 echo "$ERRORS"
 if [ "$ERRORS" != "(@as [],)" ]; then

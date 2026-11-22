@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Ensure glib-compile-schemas is available
+        run: |
+          if ! command -v glib-compile-schemas >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y libglib2.0-bin
+          fi
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+      - run: make check
+      - run: make pack
+
+      - name: Verify package contents
+        run: |
+          LIST="$(unzip -Z1 notman.zip)"
+          for required in metadata.json extension.js prefs.js schemas/gschemas.compiled; do
+            echo "$LIST" | grep -qx "$required" || { echo "Missing $required in notman.zip"; exit 1; }
+          done
+          if echo "$LIST" | grep -qE '(^node_modules/|\.ts$)'; then
+            echo "Unexpected source or node_modules files in notman.zip"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" notman.zip \
+            --title "Notman ${GITHUB_REF_NAME}" \
+            --generate-notes
