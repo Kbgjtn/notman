@@ -1,7 +1,7 @@
 import type Gio from "gi://Gio";
 
 import { log } from "./log.js";
-import { type RuleSettings, ThumbnailMode } from "./types.js";
+import { IndicatorPosition, type RuleSettings, ThumbnailMode } from "./types.js";
 
 export enum SettingKey {
   GuardEnabled = "guard-enabled",
@@ -18,6 +18,8 @@ export enum SettingKey {
   GlobalExpireMinutes = "global-expire-minutes",
   GlobalMaxCount = "global-max-count",
   ShowIndicator = "show-indicator",
+  IndicatorPosition = "indicator-position",
+  IndicatorIndex = "indicator-index",
   ClearOnPanelOpen = "clear-on-panel-open",
   DebugLogging = "debug-logging",
 }
@@ -58,6 +60,12 @@ export function parseThumbnailMode(raw: string): ThumbnailMode {
   if (raw === ThumbnailMode.Compact) return ThumbnailMode.Compact;
   if (raw === ThumbnailMode.TextOnly) return ThumbnailMode.TextOnly;
   return ThumbnailMode.Full;
+}
+
+export function parseIndicatorPosition(raw: string): IndicatorPosition {
+  if (raw === IndicatorPosition.Left) return IndicatorPosition.Left;
+  if (raw === IndicatorPosition.Center) return IndicatorPosition.Center;
+  return IndicatorPosition.Right;
 }
 
 function clampMaxCount(value: number): number {

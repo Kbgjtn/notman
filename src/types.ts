@@ -4,6 +4,12 @@ export enum ThumbnailMode {
   TextOnly = "text-only",
 }
 
+export enum IndicatorPosition {
+  Left = "left",
+  Center = "center",
+  Right = "right",
+}
+
 export enum SourceKey {
   Screenshot = "screenshot",
   Screencast = "screencast",

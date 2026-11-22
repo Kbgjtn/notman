@@ -142,6 +142,28 @@
       </description>
     </key>
 
+    <key name="indicator-position" type="s">
+      <default>'right'</default>
+      <choices>
+        <choice value='left'/>
+        <choice value='center'/>
+        <choice value='right'/>
+      </choices>
+      <summary>Top-bar indicator position</summary>
+      <description>
+        Panel box where the Notman status indicator is placed.
+      </description>
+    </key>
+
+    <key name="indicator-index" type="i">
+      <default>0</default>
+      <range min="0" max="20"/>
+      <summary>Top-bar indicator index</summary>
+      <description>
+        Order index of the Notman status indicator within the chosen panel box.
+      </description>
+    </key>
+
     <key name="clear-on-panel-open" type="b">
       <default>false</default>
       <summary>Clear screenshot notifications when the notification list opens</summary>

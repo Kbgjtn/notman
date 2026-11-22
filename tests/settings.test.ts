@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { parseThumbnailMode, SettingKey, SettingsStore } from "../src/settings.js";
-import { type RuleSettings, ThumbnailMode } from "../src/types.js";
+import {
+  parseIndicatorPosition,
+  parseThumbnailMode,
+  SettingKey,
+  SettingsStore,
+} from "../src/settings.js";
+import { IndicatorPosition, type RuleSettings, ThumbnailMode } from "../src/types.js";
 
 function fakeBackend(settings: Record<string, unknown>) {
   let changedCb: ((_s: unknown, key?: string) => void) | null = null;
@@ -185,5 +190,12 @@ describe("SettingsStore", () => {
     expect(parseThumbnailMode(ThumbnailMode.Compact)).toBe(ThumbnailMode.Compact);
     expect(parseThumbnailMode(ThumbnailMode.TextOnly)).toBe(ThumbnailMode.TextOnly);
     expect(parseThumbnailMode("unexpected")).toBe(ThumbnailMode.Full);
+  });
+
+  it("parses indicator positions cleanly with fallback to right", () => {
+    expect(parseIndicatorPosition(IndicatorPosition.Left)).toBe(IndicatorPosition.Left);
+    expect(parseIndicatorPosition(IndicatorPosition.Center)).toBe(IndicatorPosition.Center);
+    expect(parseIndicatorPosition(IndicatorPosition.Right)).toBe(IndicatorPosition.Right);
+    expect(parseIndicatorPosition("unexpected")).toBe(IndicatorPosition.Right);
   });
 });

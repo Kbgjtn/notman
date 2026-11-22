@@ -6,9 +6,9 @@ import { Disposables } from "./src/disposables.js";
 import { Engine } from "./src/engine.js";
 import { GlibScheduler } from "./src/glib-scheduler.js";
 import { log } from "./src/log.js";
-import { SettingKey, SettingsStore } from "./src/settings.js";
+import { parseIndicatorPosition, SettingKey, SettingsStore } from "./src/settings.js";
 import { ShellBridge } from "./src/shell-bridge.js";
-import { CapabilityTier, type SignalEmitter } from "./src/types.js";
+import { CapabilityTier, type IndicatorPosition, type SignalEmitter } from "./src/types.js";
 import { TrayIndicator } from "./src/ui/tray.js";
 
 export default class NotmanExtension extends Extension {
@@ -96,30 +96,55 @@ export default class NotmanExtension extends Extension {
         });
       }
 
-      // Dynamically show or hide the top-bar indicator based on show-indicator.
+      // Dynamically show, hide, or reposition the top-bar indicator.
       if (capabilities.topBar) {
         let indicator: TrayIndicator | null = null;
+        let currentPosition: IndicatorPosition | null = null;
+        let currentIndex: number | null = null;
         const syncIndicator = (): void => {
           const wantIndicator = rawSettings.get_boolean(SettingKey.ShowIndicator);
-          if (wantIndicator && !indicator) {
-            indicator = TrayIndicator.create(this.uuid, rawSettings, engine, () =>
-              this.openPreferences(),
-            );
-          } else if (!wantIndicator && indicator) {
+          const position = parseIndicatorPosition(
+            rawSettings.get_string(SettingKey.IndicatorPosition),
+          );
+          const index = Math.max(0, rawSettings.get_int(SettingKey.IndicatorIndex));
+          if (!wantIndicator) {
+            if (indicator) {
+              indicator.destroy();
+              indicator = null;
+              currentPosition = null;
+              currentIndex = null;
+            }
+            return;
+          }
+          if (indicator && currentPosition === position && currentIndex === index) return;
+          if (indicator) {
             indicator.destroy();
             indicator = null;
           }
+          indicator = TrayIndicator.create(
+            this.uuid,
+            rawSettings,
+            engine,
+            () => this.openPreferences(),
+            position,
+            index,
+          );
+          currentPosition = indicator ? position : null;
+          currentIndex = indicator ? index : null;
         };
         syncIndicator();
-        const indicatorSettingId = rawSettings.connect(
-          `changed::${SettingKey.ShowIndicator}`,
-          syncIndicator,
-        );
+        const indicatorSettingIds = [
+          rawSettings.connect(`changed::${SettingKey.ShowIndicator}`, syncIndicator),
+          rawSettings.connect(`changed::${SettingKey.IndicatorPosition}`, syncIndicator),
+          rawSettings.connect(`changed::${SettingKey.IndicatorIndex}`, syncIndicator),
+        ];
         disposables.add(() => {
-          try {
-            rawSettings.disconnect(indicatorSettingId);
-          } catch {
-            // Settings may already be gone.
+          for (const id of indicatorSettingIds) {
+            try {
+              rawSettings.disconnect(id);
+            } catch {
+              // Settings may already be gone.
+            }
           }
           indicator?.destroy();
           indicator = null;

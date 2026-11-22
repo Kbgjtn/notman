@@ -10,7 +10,7 @@ import { formatBytes } from "../byte-estimate.js";
 import type { Engine } from "../engine.js";
 import { log } from "../log.js";
 import { parseThumbnailMode, SettingKey } from "../settings.js";
-import { type SignalEmitter, ThumbnailMode } from "../types.js";
+import { type IndicatorPosition, type SignalEmitter, ThumbnailMode } from "../types.js";
 
 type SwitchItem = SignalEmitter & {
   state: boolean;
@@ -49,6 +49,8 @@ export class TrayIndicator {
     private readonly _settings: Gio.Settings,
     private readonly _engine: Engine,
     openPreferences: () => void,
+    position: IndicatorPosition,
+    index: number,
   ) {
     this._indicator = new PanelMenu.Button(0.5, _("Notman")) as unknown as IndicatorButton;
     this._icon = new St.Icon({
@@ -56,7 +58,7 @@ export class TrayIndicator {
       style_class: "system-status-icon",
     });
     this._indicator.add_child(this._icon);
-    Main.panel.addToStatusArea(uuid, this._indicator as never);
+    Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
 
     const menu = this._indicator.menu;
 
@@ -123,9 +125,11 @@ export class TrayIndicator {
     settings: Gio.Settings,
     engine: Engine,
     openPreferences: () => void,
+    position: IndicatorPosition,
+    index: number,
   ): TrayIndicator | null {
     try {
-      return new TrayIndicator(uuid, settings, engine, openPreferences);
+      return new TrayIndicator(uuid, settings, engine, openPreferences, position, index);
     } catch (e) {
       log.err("tray", "setup failed", e);
       return null;
