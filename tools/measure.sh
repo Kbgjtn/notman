@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stage 0 baseline harness.
+# Bounded baseline harness.
 #
 # Fires N screenshots through the GNOME 46 Shift+Print keybinding. That handler
 # calls captureScreenshot() -> _storeScreenshot(), the same path that creates the

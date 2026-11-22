@@ -1,4 +1,4 @@
-import type { NotificationHandle } from './types.js';
+import type { NotificationHandle } from "./types.js";
 
 export interface StatsSnapshot {
   activeCount: number;

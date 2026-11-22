@@ -4,11 +4,11 @@ import {
   type Rule,
   type RuleContext,
   type RuleOutcome,
-} from '../types.js';
+} from "../types.js";
 
 /** Retention, expiry, thumbnail and memory rules for screenshot sources. */
 export class ScreenshotRule implements Rule {
-  readonly id = 'screenshot';
+  readonly id = "screenshot";
 
   evaluate(handles: NotificationHandle[], context: RuleContext): RuleOutcome {
     const outcome = emptyOutcome();
@@ -17,7 +17,7 @@ export class ScreenshotRule implements Rule {
 
     const shots = handles.filter(
       (h) =>
-        h.sourceKey === 'screenshot' &&
+        h.sourceKey === "screenshot" &&
         !h.isCritical &&
         !h.forFeedback &&
         h.id !== context.currentlyShownId,
@@ -29,7 +29,7 @@ export class ScreenshotRule implements Rule {
       return outcome;
     }
 
-    if (settings.thumbnailMode === 'text-only') {
+    if (settings.thumbnailMode === "text-only") {
       for (const handle of shots) {
         if (!handle.isDowngraded()) outcome.downgrade.push(handle);
       }

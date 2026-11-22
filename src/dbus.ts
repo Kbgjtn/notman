@@ -1,12 +1,12 @@
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
+import Gio from "gi://Gio";
+import GLib from "gi://GLib";
 
-import type { Disposables } from './disposables.js';
-import type { Engine } from './engine.js';
-import { logErr } from './log.js';
+import type { Disposables } from "./disposables.js";
+import type { Engine } from "./engine.js";
+import { logErr } from "./log.js";
 
-const BUS_NAME = 'org.gnome.Shell.Extensions.NotificationTuner';
-const OBJECT_PATH = '/org/gnome/Shell/Extensions/NotificationTuner';
+const BUS_NAME = "org.gnome.Shell.Extensions.Notman";
+const OBJECT_PATH = "/org/gnome/Shell/Extensions/Notman";
 
 const XML = `
 <node>
@@ -30,10 +30,10 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
   try {
     const node = Gio.DBusNodeInfo.new_for_xml(XML);
     const lookedUp = node.lookup_interface(BUS_NAME);
-    if (!lookedUp) throw new Error('interface missing from generated node info');
+    if (!lookedUp) throw new Error("interface missing from generated node info");
     interfaceInfo = lookedUp;
   } catch (e) {
-    logErr(e, 'notman: invalid D-Bus interface XML');
+    logErr(e, "notman: invalid D-Bus interface XML");
     return false;
   }
 
@@ -56,34 +56,34 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
             invocation: Gio.DBusMethodInvocation,
           ) => {
             switch (method) {
-              case 'GetStats': {
+              case "GetStats": {
                 const stats = engine.getStats();
                 const dict: Record<string, GLib.Variant> = {
-                  activeCount: new GLib.Variant('i', stats.activeCount),
-                  estimatedBytes: new GLib.Variant('x', stats.estimatedBytes),
-                  peakBytes: new GLib.Variant('x', stats.peakBytes),
-                  prunedCount: new GLib.Variant('i', stats.prunedCount),
-                  shellRssBytes: new GLib.Variant('x', stats.shellRssBytes),
-                  adapterId: new GLib.Variant('s', stats.adapterId),
-                  tier: new GLib.Variant('i', stats.tier),
+                  activeCount: new GLib.Variant("i", stats.activeCount),
+                  estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
+                  peakBytes: new GLib.Variant("x", stats.peakBytes),
+                  prunedCount: new GLib.Variant("i", stats.prunedCount),
+                  shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
+                  adapterId: new GLib.Variant("s", stats.adapterId),
+                  tier: new GLib.Variant("i", stats.tier),
                 };
-                const result = new GLib.Variant('(a{sv})', [dict]);
+                const result = new GLib.Variant("(a{sv})", [dict]);
                 invocation.return_value(
                   result as unknown as Parameters<typeof invocation.return_value>[0],
                 );
                 break;
               }
-              case 'ClearScreenshots':
+              case "ClearScreenshots":
                 engine.clearScreenshots();
                 invocation.return_value(null);
                 break;
-              case 'SetEnabled': {
+              case "SetEnabled": {
                 const [enabled] = params.deepUnpack() as [boolean];
                 engine.setEnabled(enabled);
                 invocation.return_value(null);
                 break;
               }
-              case 'SetMaxCount': {
+              case "SetMaxCount": {
                 const [count] = params.deepUnpack() as [number];
                 engine.setMaxCount(count);
                 invocation.return_value(null);
@@ -91,7 +91,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
               }
               default:
                 invocation.return_dbus_error(
-                  'org.freedesktop.DBus.Error.UnknownMethod',
+                  "org.freedesktop.DBus.Error.UnknownMethod",
                   `Unknown method: ${method}`,
                 );
             }
@@ -107,7 +107,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
           }
         });
       } catch (e) {
-        logErr(e, 'notman: D-Bus object registration failed');
+        logErr(e, "notman: D-Bus object registration failed");
       }
     },
     null,

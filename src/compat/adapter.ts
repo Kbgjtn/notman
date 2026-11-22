@@ -1,4 +1,4 @@
-import { V46Adapter } from './v46.js';
+import { V46Adapter } from "./v46.js";
 
 export interface AdapterCapabilities {
   tray: boolean;
@@ -18,7 +18,7 @@ export interface ShellAdapter {
  * the shell does not expose a stable resource path for its version.
  */
 export function detectAdapter(shellVersion: string): ShellAdapter | null {
-  const major = shellVersion.split('.')[0];
-  if (major === '46') return new V46Adapter();
+  const major = shellVersion.split(".")[0];
+  if (major === "46") return new V46Adapter();
   return null;
 }

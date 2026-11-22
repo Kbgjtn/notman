@@ -16,12 +16,6 @@ shell's memory climbs until the desktop buffers and lags.
 GNOME Settings exposes none of this: no per-source mute for shell-internal
 sources, no retention limit, no expiry, no memory budget, no thumbnail control.
 
-## Status
-
-- **Stage 0** — repository scaffold, schema, build config and the bounded
-  baseline harness. The extension skeleton does nothing yet.
-- Engine, panel UI, preferences and D-Bus API are staged for later.
-
 ## Requirements
 
 - GNOME Shell 46 (pinned in `metadata.json`)

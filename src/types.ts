@@ -1,4 +1,4 @@
-export type ThumbnailMode = 'full' | 'text-only';
+export type ThumbnailMode = "full" | "text-only";
 
 export interface RuleSettings {
   guardEnabled: boolean;

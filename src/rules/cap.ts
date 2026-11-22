@@ -4,11 +4,11 @@ import {
   type Rule,
   type RuleContext,
   type RuleOutcome,
-} from '../types.js';
+} from "../types.js";
 
 /** Last-resort bound, independent of the screenshot-specific rules. */
 export class CapRule implements Rule {
-  readonly id = 'cap';
+  readonly id = "cap";
 
   evaluate(handles: NotificationHandle[], context: RuleContext): RuleOutcome {
     const outcome = emptyOutcome();

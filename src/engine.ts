@@ -1,11 +1,11 @@
-import { logErr } from './log.js';
-import { CapRule } from './rules/cap.js';
-import { ScreenshotRule } from './rules/screenshot.js';
-import type { Scheduler } from './scheduler.js';
-import type { SettingsStore } from './settings.js';
-import type { Bridge } from './shell-bridge.js';
-import { Stats, type StatsSnapshot } from './stats.js';
-import type { NotificationHandle, Rule, RuleContext } from './types.js';
+import { logErr } from "./log.js";
+import { CapRule } from "./rules/cap.js";
+import { ScreenshotRule } from "./rules/screenshot.js";
+import type { Scheduler } from "./scheduler.js";
+import type { SettingsStore } from "./settings.js";
+import type { Bridge } from "./shell-bridge.js";
+import { Stats, type StatsSnapshot } from "./stats.js";
+import type { NotificationHandle, Rule, RuleContext } from "./types.js";
 
 const SWEEP_INTERVAL_MS = 1000;
 
@@ -49,6 +49,7 @@ export class Engine {
     this._bridge.stop();
     this._handles.clear();
     this._pending.clear();
+    this._stats.update([]);
     this._started = false;
   }
 
@@ -100,7 +101,7 @@ export class Engine {
     try {
       handle.destroy();
     } catch (e) {
-      logErr(e, 'notman: destroying notification failed');
+      logErr(e, "notman: destroying notification failed");
     }
   }
 
@@ -111,7 +112,7 @@ export class Engine {
 
   clearScreenshots(): void {
     for (const handle of [...this._handles.values()]) {
-      if (handle.sourceKey === 'screenshot') this.destroyHandle(handle);
+      if (handle.sourceKey === "screenshot") this.destroyHandle(handle);
     }
   }
 

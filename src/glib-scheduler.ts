@@ -1,6 +1,6 @@
-import GLib from 'gi://GLib';
+import GLib from "gi://GLib";
 
-import type { Scheduler } from './scheduler.js';
+import type { Scheduler } from "./scheduler.js";
 
 export class GlibScheduler implements Scheduler {
   every(intervalMs: number, callback: () => void): number {

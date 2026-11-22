@@ -1,12 +1,12 @@
-import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
-import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
+import Gio from "gi://Gio";
+import GLib from "gi://GLib";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
-import type { AdapterCapabilities, ShellAdapter } from './compat/adapter.js';
-import type { Disposables } from './disposables.js';
-import { logErr } from './log.js';
-import type { NotificationHandle } from './types.js';
+import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
+import type { Disposables } from "./disposables.js";
+import { logErr } from "./log.js";
+import type { NotificationHandle } from "./types.js";
 
 type SignalEmitter = {
   connect(signal: string, callback: (...args: unknown[]) => void): number;
@@ -43,7 +43,7 @@ export function createBridge(
   disposables: Disposables,
 ): Bridge | null {
   const tray = Main.messageTray as unknown as TrayLike | null;
-  if (!capabilities.tray || !tray || typeof tray.getSources !== 'function') return null;
+  if (!capabilities.tray || !tray || typeof tray.getSources !== "function") return null;
 
   const ids = new WeakMap<object, number>();
   const destroyed = new WeakSet<object>();
@@ -54,14 +54,14 @@ export function createBridge(
   let stopped = false;
 
   const idFor = (notification: unknown): number | null => {
-    if (!notification || typeof notification !== 'object') return null;
+    if (!notification || typeof notification !== "object") return null;
     return ids.get(notification) ?? null;
   };
 
   const estimateBytes = (icon: unknown): number => {
-    if (!icon || typeof icon !== 'object') return 0;
+    if (!icon || typeof icon !== "object") return 0;
     const sized = icon as { get_preferred_size?: () => unknown };
-    if (typeof sized.get_preferred_size !== 'function') return 0;
+    if (typeof sized.get_preferred_size !== "function") return 0;
     try {
       const size = sized.get_preferred_size();
       if (Array.isArray(size) && size.length >= 2) {
@@ -78,16 +78,16 @@ export function createBridge(
 
   const decode = (bytes: Uint8Array): string => {
     try {
-      return new TextDecoder('utf-8').decode(bytes);
+      return new TextDecoder("utf-8").decode(bytes);
     } catch {
-      let text = '';
+      let text = "";
       for (const byte of bytes) text += String.fromCharCode(byte);
       return text;
     }
   };
 
   const makeHandle = (notification: unknown, sourceKey: string): NotificationHandle | null => {
-    if (!notification || typeof notification !== 'object') return null;
+    if (!notification || typeof notification !== "object") return null;
     const target = notification as NotificationLike;
     let id = ids.get(target);
     if (id === undefined) {
@@ -107,11 +107,11 @@ export function createBridge(
         if (downgraded.has(target)) return;
         try {
           target.gicon = new Gio.ThemedIcon({
-            name: 'screenshot-recorded-symbolic',
+            name: "screenshot-recorded-symbolic",
           });
           downgraded.add(target);
         } catch (e) {
-          logErr(e, 'notman: could not downgrade thumbnail');
+          logErr(e, "notman: could not downgrade thumbnail");
         }
       },
       destroy: () => {
@@ -122,7 +122,7 @@ export function createBridge(
           try {
             target.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
           } catch (e) {
-            logErr(e, 'notman: could not destroy notification');
+            logErr(e, "notman: could not destroy notification");
           }
           return GLib.SOURCE_REMOVE;
         });
@@ -136,10 +136,10 @@ export function createBridge(
     onAdded: (notification: unknown) => void,
     onDestroyed: (notification: unknown) => void,
   ): void => {
-    if (!notification || typeof notification !== 'object') return;
+    if (!notification || typeof notification !== "object") return;
     const emitter = notification as SignalEmitter;
-    if (typeof emitter.connect !== 'function') return;
-    const signalId = emitter.connect('destroy', () => onDestroyed(notification));
+    if (typeof emitter.connect !== "function") return;
+    const signalId = emitter.connect("destroy", () => onDestroyed(notification));
     disposables.add(() => {
       try {
         emitter.disconnect(signalId);
@@ -155,12 +155,12 @@ export function createBridge(
     onAdded: (notification: unknown) => void,
     onDestroyed: (notification: unknown) => void,
   ): void => {
-    if (!source || typeof source !== 'object' || seenSources.has(source)) return;
+    if (!source || typeof source !== "object" || seenSources.has(source)) return;
     seenSources.add(source);
     if (!adapter.isScreenshotSource(source)) return;
     const emitter = source as SignalEmitter;
-    if (typeof emitter.connect !== 'function') return;
-    const signalId = emitter.connect('notification-added', (...args: unknown[]) => {
+    if (typeof emitter.connect !== "function") return;
+    const signalId = emitter.connect("notification-added", (...args: unknown[]) => {
       attachNotification(args[0], onAdded, onDestroyed);
     });
     disposables.add(() => {
@@ -176,7 +176,7 @@ export function createBridge(
     capabilities,
 
     start(onAdded, onDestroyed) {
-      const sourceAddedId = tray.connect('source-added', (...args: unknown[]) => {
+      const sourceAddedId = tray.connect("source-added", (...args: unknown[]) => {
         observeSource(args[0], onAdded, onDestroyed);
       });
       disposables.add(() => {
@@ -191,9 +191,9 @@ export function createBridge(
     },
 
     sourceKeyFor(notification) {
-      if (!notification || typeof notification !== 'object') return 'other';
+      if (!notification || typeof notification !== "object") return "other";
       const source = (notification as { source?: unknown }).source;
-      return adapter.isScreenshotSource(source) ? 'screenshot' : 'other';
+      return adapter.isScreenshotSource(source) ? "screenshot" : "other";
     },
 
     makeHandle,
@@ -207,7 +207,7 @@ export function createBridge(
 
     readRssBytes() {
       try {
-        const [ok, contents] = Gio.File.new_for_path('/proc/self/status').load_contents(null);
+        const [ok, contents] = Gio.File.new_for_path("/proc/self/status").load_contents(null);
         if (!ok) return 0;
         const match = /^VmRSS:\s+(\d+)\s+kB/m.exec(decode(contents));
         return match ? Number(match[1]) * 1024 : 0;
