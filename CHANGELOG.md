@@ -15,5 +15,5 @@ All notable changes to Notman are documented in this file.
 - **Scheduled Do Not Disturb (Quiet hours)**: automatically mute banners on a daily schedule while respecting manual DND state.
 - **Import / Export settings**: save and restore Notman configuration as JSON from Preferences.
 - **GNOME Shell 46, 47, and 48 support**: modular compatibility adapters including GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` handling.
-- **Native UI**: tabbed libadwaita Preferences (`General`, `Screenshots`, `Retention`, `About`), top-bar quick menu with live adaptive-unit stats and configurable panel position/order, plus D-Bus inspection API.
-- **Verification**: 92 unit tests, isolated Xvfb GNOME Shell smoke test, bounded benchmark harness, and GNOME 46/47/48 CI compatibility matrix.
+- **Native UI**: tabbed libadwaita Preferences (`General`, `Captures`, `Limits`, `About`), top-bar quick menu with live adaptive-unit stats and configurable panel position/order, plus D-Bus inspection API.
+- **Verification**: 104 unit tests, isolated Xvfb GNOME Shell smoke test, bounded benchmark harness, and GNOME 46/47/48 CI compatibility matrix.
