@@ -6,23 +6,24 @@ import { Disposables } from "./src/disposables.js";
 import { Engine } from "./src/engine.js";
 import { GlibScheduler } from "./src/glib-scheduler.js";
 import { log } from "./src/log.js";
-import { SettingsStore } from "./src/settings.js";
-import { createBridge } from "./src/shell-bridge.js";
-import { createTrayUi, type TrayUi } from "./src/ui/tray.js";
+import { SettingKey, SettingsStore } from "./src/settings.js";
+import { ShellBridge } from "./src/shell-bridge.js";
+import { CapabilityTier, type SignalEmitter } from "./src/types.js";
+import { TrayIndicator } from "./src/ui/tray.js";
 
 export default class NotmanExtension extends Extension {
   private _engine: Engine | null = null;
   private _disposables: Disposables | null = null;
-  private _tray: TrayUi | null = null;
 
   enable(): void {
-    if (this._engine || this._disposables || this._tray) this.disable();
+    if (this._engine || this._disposables) this.disable();
+    const disposables = new Disposables();
+    this._disposables = disposables;
+
     try {
-      const versions = this.metadata["shell-version"] as string[] | undefined;
-      const version = versions?.[0] ?? "";
-      const adapter = detectAdapter(version);
+      const adapter = detectAdapter();
       if (!adapter) {
-        log.info("extension", `unsupported shell version '${version}'`);
+        log.info("extension", "unsupported GNOME Shell version");
         return;
       }
 
@@ -33,41 +34,101 @@ export default class NotmanExtension extends Extension {
       }
 
       const rawSettings = this.getSettings();
-      try {
-        log.setDebugEnabled(rawSettings.get_boolean("debug-logging"));
-      } catch (e) {
-        log.err("extension", "could not read debug-logging", e);
-      }
+      const syncDebugLogging = (): void => {
+        try {
+          log.setDebugEnabled(rawSettings.get_boolean(SettingKey.DebugLogging));
+        } catch (e) {
+          log.err("extension", `could not read ${SettingKey.DebugLogging}`, e);
+        }
+      };
+      syncDebugLogging();
+      const debugId = rawSettings.connect(`changed::${SettingKey.DebugLogging}`, syncDebugLogging);
+      disposables.add(() => {
+        try {
+          rawSettings.disconnect(debugId);
+        } catch {
+          // Settings may already be gone.
+        }
+      });
+
       log.debug(
         "extension",
-        `enable adapter=${adapter.id} tray=${capabilities.tray} panel=${capabilities.panel}`,
+        `enable adapter=${adapter.id} tray=${capabilities.tray} topBar=${capabilities.topBar} dateMenu=${capabilities.dateMenu}`,
       );
 
       const settings = new SettingsStore(rawSettings);
-      const disposables = new Disposables();
-      this._disposables = disposables;
-      const bridge = createBridge(adapter, capabilities, disposables);
+      disposables.add(() => settings.dispose());
+
+      const bridge = ShellBridge.create(adapter, capabilities, disposables);
       if (!bridge) {
-        disposables.dispose();
+        this.disable();
         log.info("extension", "shell bridge unavailable, guard not enabled");
         return;
       }
 
-      const tier = capabilities.panel ? 2 : 1;
+      const tier = capabilities.topBar ? CapabilityTier.TopBar : CapabilityTier.Headless;
       const engine = new Engine(settings, bridge, adapter.id, tier, new GlibScheduler());
       if (!engine.start()) {
-        disposables.dispose();
+        this.disable();
         log.info("extension", "engine failed to start");
         return;
       }
-
-      // Publish references before registering D-Bus: its callback is
-      // asynchronous and a failure must still be fully teardown-able.
       this._engine = engine;
-      this._disposables = disposables;
-      this._tray = createTrayUi(adapter, rawSettings, engine, disposables);
-      if (!registerDbus(engine, disposables))
+
+      // Clear screenshot notifications when the notification list opens, if enabled.
+      const dateMenu = adapter.getDateMenuMenu() as SignalEmitter | null;
+      if (dateMenu && typeof dateMenu.connect === "function") {
+        const dateOpenId = dateMenu.connect("open-state-changed", (...args: unknown[]) => {
+          try {
+            if (args[1] && rawSettings.get_boolean(SettingKey.ClearOnPanelOpen)) {
+              engine.clearScreenshots();
+            }
+          } catch (e) {
+            log.err("extension", `${SettingKey.ClearOnPanelOpen} failed`, e);
+          }
+        });
+        disposables.add(() => {
+          try {
+            dateMenu.disconnect(dateOpenId);
+          } catch {
+            // Menu may already be gone.
+          }
+        });
+      }
+
+      // Dynamically show or hide the top-bar indicator based on show-indicator.
+      if (capabilities.topBar) {
+        let indicator: TrayIndicator | null = null;
+        const syncIndicator = (): void => {
+          const wantIndicator = rawSettings.get_boolean(SettingKey.ShowIndicator);
+          if (wantIndicator && !indicator) {
+            indicator = TrayIndicator.create(this.uuid, rawSettings, engine, () =>
+              this.openPreferences(),
+            );
+          } else if (!wantIndicator && indicator) {
+            indicator.destroy();
+            indicator = null;
+          }
+        };
+        syncIndicator();
+        const indicatorSettingId = rawSettings.connect(
+          `changed::${SettingKey.ShowIndicator}`,
+          syncIndicator,
+        );
+        disposables.add(() => {
+          try {
+            rawSettings.disconnect(indicatorSettingId);
+          } catch {
+            // Settings may already be gone.
+          }
+          indicator?.destroy();
+          indicator = null;
+        });
+      }
+
+      if (!registerDbus(engine, disposables)) {
         log.warn("extension", "D-Bus API unavailable, guard still active");
+      }
       log.info("extension", `enabled adapter=${adapter.id} tier=${tier}`);
     } catch (e) {
       log.err("extension", "enable failed", e);
@@ -76,11 +137,6 @@ export default class NotmanExtension extends Extension {
   }
 
   disable(): void {
-    try {
-      this._tray?.destroy();
-    } catch (e) {
-      log.err("extension", "panel destroy failed", e);
-    }
     try {
       this._engine?.stop();
     } catch (e) {
@@ -93,7 +149,6 @@ export default class NotmanExtension extends Extension {
     }
     this._engine = null;
     this._disposables = null;
-    this._tray = null;
     log.setDebugEnabled(false);
   }
 }

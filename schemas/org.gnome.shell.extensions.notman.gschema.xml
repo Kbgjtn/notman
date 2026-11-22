@@ -5,9 +5,9 @@
 
     <key name="guard-enabled" type="b">
       <default>true</default>
-      <summary>Master guard</summary>
+      <summary>Enable guard</summary>
       <description>
-        Master opt-out. When false, no retention or expiry rules are enforced.
+        Master switch. When false, no retention or expiry rules are enforced.
       </description>
     </key>
 
@@ -16,7 +16,7 @@
       <summary>Allow screenshot notifications</summary>
       <description>
         When false, screenshot notifications are discarded as soon as they are
-        received. Opt-out for the screenshot rule.
+        received.
       </description>
     </key>
 
@@ -26,7 +26,7 @@
         <choice value='full'/>
         <choice value='text-only'/>
       </choices>
-      <summary>Screenshot thumbnail handling</summary>
+      <summary>Screenshot thumbnail mode</summary>
       <description>
         "full" keeps the full-resolution image in the notification.
         "text-only" replaces it with a small themed icon, releasing the
@@ -74,14 +74,17 @@
       </description>
     </key>
 
-    <key name="clear-on-panel-open" type="b">
-      <default>false</default>
-      <summary>Clear screenshot notifications when the panel opens</summary>
+    <key name="show-indicator" type="b">
+      <default>true</default>
+      <summary>Show top-bar indicator</summary>
+      <description>
+        Display the Notman status icon and quick menu in the top bar.
+      </description>
     </key>
 
-    <key name="show-stats" type="b">
-      <default>true</default>
-      <summary>Show live counters in the panel popover</summary>
+    <key name="clear-on-panel-open" type="b">
+      <default>false</default>
+      <summary>Clear screenshot notifications when the notification list opens</summary>
     </key>
 
     <key name="debug-logging" type="b">

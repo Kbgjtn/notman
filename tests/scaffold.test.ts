@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+import { SettingKey } from "../src/settings.js";
+
 const SCHEMA = "schemas/org.gnome.shell.extensions.notman.gschema.xml";
 
 describe("scaffold", () => {
@@ -11,20 +13,9 @@ describe("scaffold", () => {
     expect(metadata["settings-schema"]).toBe("org.gnome.shell.extensions.notman");
   });
 
-  it("declares every agreed settings key", () => {
+  it("declares every SettingKey in the GSettings schema", () => {
     const xml = readFileSync(SCHEMA, "utf8");
-    for (const key of [
-      "guard-enabled",
-      "screenshot-notify-enabled",
-      "screenshot-thumbnail-mode",
-      "screenshot-max-count",
-      "screenshot-expire-seconds",
-      "screenshot-memory-budget-mb",
-      "emergency-hard-cap",
-      "clear-on-panel-open",
-      "show-stats",
-      "debug-logging",
-    ]) {
+    for (const key of Object.values(SettingKey)) {
       expect(xml).toContain(`name="${key}"`);
     }
   });

@@ -1,3 +1,9 @@
+export const MiB = 1024 * 1024;
+
+export function formatMiB(bytes: number): string {
+  return `${(Math.max(0, bytes) / MiB).toFixed(1)} MiB`;
+}
+
 /**
  * Estimates RGBA8888 texture bytes from a Clutter/St content icon.
  *

@@ -6,250 +6,289 @@ import {
   gettext as _,
   ExtensionPreferences,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
-import { MiB } from "./src/ui/mappings.js";
 
-const bindingRegistry = new WeakMap<Gio.Settings, Array<{ row: unknown; property: string }>>();
+import { formatMiB } from "./src/byte-estimate.js";
+import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
+import { SettingKey } from "./src/settings.js";
+import { ThumbnailMode } from "./src/types.js";
 
-function trackBinding(settings: Gio.Settings, row: unknown, property: string): void {
-  const list = bindingRegistry.get(settings) ?? [];
-  list.push({ row, property });
-  bindingRegistry.set(settings, list);
+interface LiveStats {
+  readonly activeCount: number;
+  readonly estimatedBytes: number;
+  readonly peakBytes: number;
+  readonly prunedCount: number;
 }
 
-function addSwitch(
-  group: Adw.PreferencesGroup,
-  settings: Gio.Settings,
-  key: string,
-  title: string,
-  subtitle: string,
-): void {
-  const row = new Adw.SwitchRow({ title, subtitle });
-  settings.bind(key, row, "active", Gio.SettingsBindFlags.DEFAULT);
-  trackBinding(settings, row, "active");
-  group.add(row);
-}
-
-function addSpin(
-  group: Adw.PreferencesGroup,
-  settings: Gio.Settings,
-  key: string,
-  title: string,
-  subtitle: string,
-  lower: number,
-  upper: number,
-  step: number,
-): void {
-  const adjustment = new Gtk.Adjustment({
-    lower,
-    upper,
-    step_increment: step,
-    value: settings.get_int(key),
-  });
-  const row = new Adw.SpinRow({ title, subtitle, adjustment });
-  settings.bind(key, row, "value", Gio.SettingsBindFlags.DEFAULT);
-  trackBinding(settings, row, "value");
-  group.add(row);
-}
-
-function readStats(): Record<string, string | number> | null {
-  try {
-    const proxy = new Gio.DBusProxy({
-      g_connection: Gio.DBus.session,
-      g_interface_name: "org.gnome.Shell.Extensions.Notman",
-      g_name: "org.gnome.Shell.Extensions.Notman",
-      g_object_path: "/org/gnome/Shell/Extensions/Notman",
-    });
-    const reply = proxy.call_sync("GetStats", null, Gio.DBusCallFlags.NONE, 500, null);
-    const [dict] = reply.deepUnpack() as [Record<string, GLib.Variant>];
-    return {
-      activeCount: dict.activeCount.get_int32(),
-      estimatedBytes: Number(dict.estimatedBytes.get_int64()),
-      peakBytes: Number(dict.peakBytes.get_int64()),
-      prunedCount: dict.prunedCount.get_int32(),
-      shellRssBytes: Number(dict.shellRssBytes.get_int64()),
-      adapterId: dict.adapterId.deepUnpack() as string,
-      tier: dict.tier.get_int32(),
-    };
-  } catch {
-    return null;
-  }
+function fetchStatsAsync(callback: (stats: LiveStats | null) => void): void {
+  Gio.DBus.session.call(
+    DBUS_BUS_NAME,
+    DBUS_OBJECT_PATH,
+    DBUS_BUS_NAME,
+    DbusMethod.GetStats,
+    null,
+    null,
+    Gio.DBusCallFlags.NONE,
+    500,
+    null,
+    (connection, result) => {
+      try {
+        const reply = connection?.call_finish(result);
+        if (!reply) {
+          callback(null);
+          return;
+        }
+        const [dict] = reply.deepUnpack() as [Record<string, GLib.Variant>];
+        callback({
+          activeCount: dict.activeCount.get_int32(),
+          estimatedBytes: Number(dict.estimatedBytes.get_int64()),
+          peakBytes: Number(dict.peakBytes.get_int64()),
+          prunedCount: dict.prunedCount.get_int32(),
+        });
+      } catch {
+        callback(null);
+      }
+    },
+  );
 }
 
 export default class NotmanPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window: Adw.PreferencesWindow): void {
     const settings = this.getSettings();
-    const page = new Adw.PreferencesPage({ title: _("Notman") });
+    const bindings: Array<{ target: unknown; property: string }> = [];
+    const signalIds: number[] = [];
+    let statsTimerId: number | null = null;
+    let disposed = false;
 
-    const refreshButton = new Gtk.Button({
-      icon_name: "view-refresh-symbolic",
-      tooltip_text: _("Refresh status"),
+    const bind = (
+      key: SettingKey,
+      target: unknown,
+      property: string,
+      flags = Gio.SettingsBindFlags.DEFAULT,
+    ): void => {
+      settings.bind(key, target as never, property, flags);
+      bindings.push({ target, property });
+    };
+
+    const addSwitch = (
+      group: Adw.PreferencesGroup,
+      key: SettingKey,
+      title: string,
+      subtitle: string,
+    ): Adw.SwitchRow => {
+      const row = new Adw.SwitchRow({ title, subtitle });
+      bind(key, row, "active");
+      group.add(row);
+      return row;
+    };
+
+    const addSpin = (
+      group: Adw.PreferencesGroup,
+      key: SettingKey,
+      title: string,
+      subtitle: string,
+      lower: number,
+      upper: number,
+      step: number,
+    ): Adw.SpinRow => {
+      const adjustment = new Gtk.Adjustment({
+        lower,
+        upper,
+        step_increment: step,
+        value: settings.get_int(key),
+      });
+      const row = new Adw.SpinRow({ title, subtitle, adjustment });
+      bind(key, row, "value");
+      group.add(row);
+      return row;
+    };
+
+    const page = new Adw.PreferencesPage({
+      title: _("Notman"),
+      icon_name: "screenshot-recorded-symbolic",
     });
-    const status = new Adw.PreferencesGroup({
+
+    // --- Status ---
+    const statusGroup = new Adw.PreferencesGroup({
       title: _("Status"),
-      description: _("Live information from the running extension."),
-      header_suffix: refreshButton,
     });
-    const keptRow = new Adw.ActionRow({ title: _("Kept notifications") });
-    const memoryRow = new Adw.ActionRow({ title: _("Thumbnail memory / peak") });
-    const shellRow = new Adw.ActionRow({ title: _("Shell memory") });
-    const prunedRow = new Adw.ActionRow({ title: _("Pruned") });
-    const adapterRow = new Adw.ActionRow({ title: _("Adapter / tier") });
-    for (const row of [keptRow, memoryRow, shellRow, prunedRow, adapterRow]) status.add(row);
-    page.add(status);
+    const activeRow = new Adw.ActionRow({ title: _("Active screenshots") });
+    const prunedRow = new Adw.ActionRow({ title: _("Pruned this session") });
+    statusGroup.add(activeRow);
+    statusGroup.add(prunedRow);
+    page.add(statusGroup);
 
     const refreshStatus = (): void => {
-      const stats = readStats();
-      if (!stats) {
-        status.description = _("Notman is not running. Enable the extension or reload the shell.");
-        keptRow.subtitle = _("Unavailable");
-        memoryRow.subtitle = "—";
-        shellRow.subtitle = "—";
-        prunedRow.subtitle = "—";
-        adapterRow.subtitle = "—";
-        return;
-      }
-      status.description = _("Live information from the running extension.");
-      keptRow.subtitle = String(stats.activeCount);
-      memoryRow.subtitle =
-        `${(Number(stats.estimatedBytes) / MiB).toFixed(1)} / ` +
-        `${(Number(stats.peakBytes) / MiB).toFixed(1)} MiB`;
-      shellRow.subtitle = `${(Number(stats.shellRssBytes) / MiB).toFixed(0)} MiB`;
-      prunedRow.subtitle = String(stats.prunedCount);
-      adapterRow.subtitle = `${stats.adapterId} / ${stats.tier}`;
+      fetchStatsAsync((stats) => {
+        if (disposed) return;
+        if (!stats) {
+          statusGroup.description = _(
+            "Notman is not active. Enable the extension or reload GNOME Shell.",
+          );
+          activeRow.subtitle = _("Unavailable");
+          prunedRow.subtitle = "—";
+          return;
+        }
+        statusGroup.description = "";
+        activeRow.subtitle =
+          stats.estimatedBytes > 0
+            ? `${stats.activeCount} (${formatMiB(stats.estimatedBytes)})`
+            : String(stats.activeCount);
+        prunedRow.subtitle =
+          stats.peakBytes > 0
+            ? `${stats.prunedCount} · ${_("Peak")} ${formatMiB(stats.peakBytes)}`
+            : String(stats.prunedCount);
+      });
     };
     refreshStatus();
-    refreshButton.connect("clicked", refreshStatus);
-    const statsTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2, () => {
+    statsTimerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2, () => {
       refreshStatus();
       return GLib.SOURCE_CONTINUE;
     });
 
-    const guard = new Adw.PreferencesGroup({
-      title: _("Guard"),
-      description: _("Retention rules applied to screenshot notifications."),
+    // --- General ---
+    const generalGroup = new Adw.PreferencesGroup({
+      title: _("General"),
     });
     addSwitch(
-      guard,
-      settings,
-      "guard-enabled",
+      generalGroup,
+      SettingKey.GuardEnabled,
       _("Enable guard"),
       _("Turn off to let GNOME handle notifications unchanged."),
     );
     addSwitch(
-      guard,
-      settings,
-      "screenshot-notify-enabled",
-      _("Screenshot notifications"),
-      _("Turn off to discard screenshot notifications on arrival."),
+      generalGroup,
+      SettingKey.ShowIndicator,
+      _("Show top-bar indicator"),
+      _("Display quick toggles and live status in the top bar."),
     );
-    page.add(guard);
+    addSwitch(
+      generalGroup,
+      SettingKey.ClearOnPanelOpen,
+      _("Clear when notification list opens"),
+      _("Remove kept screenshot notifications when opening the calendar menu."),
+    );
+    page.add(generalGroup);
 
-    const rules = new Adw.PreferencesGroup({
-      title: _("Screenshot rules"),
-      description: _("Limits are opt-out; zero means unlimited."),
+    // --- Screenshot notifications ---
+    const rulesGroup = new Adw.PreferencesGroup({
+      title: _("Screenshot notifications"),
+      description: _("Zero disables an individual limit."),
     });
+    bind(SettingKey.GuardEnabled, rulesGroup, "sensitive", Gio.SettingsBindFlags.GET);
+
+    addSwitch(
+      rulesGroup,
+      SettingKey.ScreenshotNotifyEnabled,
+      _("Allow screenshot notifications"),
+      _("Turn off to discard screenshot notifications immediately."),
+    );
+
     const modes = new Gtk.StringList({});
     modes.append(_("Full thumbnail"));
     modes.append(_("Text only"));
     const modeRow = new Adw.ComboRow({
-      title: _("Thumbnail"),
-      subtitle: _("Text only releases the full-resolution image."),
+      title: _("Thumbnail mode"),
+      subtitle: _("Text only releases the full-resolution image immediately."),
       model: modes,
     });
-    modeRow.selected = settings.get_string("screenshot-thumbnail-mode") === "text-only" ? 1 : 0;
+    const readModeIndex = (): number =>
+      settings.get_string(SettingKey.ScreenshotThumbnailMode) === ThumbnailMode.TextOnly ? 1 : 0;
+    modeRow.selected = readModeIndex();
     modeRow.connect("notify::selected", () => {
       settings.set_string(
-        "screenshot-thumbnail-mode",
-        modeRow.selected === 1 ? "text-only" : "full",
+        SettingKey.ScreenshotThumbnailMode,
+        modeRow.selected === 1 ? ThumbnailMode.TextOnly : ThumbnailMode.Full,
       );
     });
-    const modeChangedId = settings.connect("changed::screenshot-thumbnail-mode", () => {
-      const selected = settings.get_string("screenshot-thumbnail-mode") === "text-only" ? 1 : 0;
-      if (modeRow.selected !== selected) modeRow.selected = selected;
-    });
-    const cleanup = (): void => {
-      GLib.source_remove(statsTimer);
-      settings.disconnect(modeChangedId);
-      for (const binding of bindingRegistry.get(settings) ?? [])
-        Gio.Settings.unbind(binding.row as never, binding.property);
-      bindingRegistry.delete(settings);
-    };
-    window.connect("close-request", cleanup);
-    window.connect("destroy", cleanup);
-    rules.add(modeRow);
-    addSpin(
-      rules,
-      settings,
-      "screenshot-max-count",
+    signalIds.push(
+      settings.connect(`changed::${SettingKey.ScreenshotThumbnailMode}`, () => {
+        const selected = readModeIndex();
+        if (modeRow.selected !== selected) modeRow.selected = selected;
+      }),
+    );
+    rulesGroup.add(modeRow);
+
+    const maxCountRow = addSpin(
+      rulesGroup,
+      SettingKey.ScreenshotMaxCount,
       _("Maximum retained"),
-      _("Oldest notifications are removed beyond this count."),
+      _("Oldest screenshot notifications are removed beyond this count."),
       0,
       100,
       1,
     );
-    addSpin(
-      rules,
-      settings,
-      "screenshot-expire-seconds",
-      _("Expire after"),
-      _("Seconds before a notification is removed; zero disables."),
+    const expireRow = addSpin(
+      rulesGroup,
+      SettingKey.ScreenshotExpireSeconds,
+      _("Expire after (seconds)"),
+      _("Remove screenshot notifications after this many seconds."),
       0,
       300,
       1,
     );
-    addSpin(
-      rules,
-      settings,
-      "screenshot-memory-budget-mb",
-      _("Memory budget"),
-      _("Estimated thumbnail memory in MiB; zero disables."),
+    const budgetRow = addSpin(
+      rulesGroup,
+      SettingKey.ScreenshotMemoryBudgetMb,
+      _("Memory budget (MiB)"),
+      _("Prune oldest screenshots when estimated thumbnail memory exceeds this limit."),
       0,
       512,
       8,
     );
+
+    for (const dependentRow of [modeRow, maxCountRow, expireRow, budgetRow]) {
+      bind(
+        SettingKey.ScreenshotNotifyEnabled,
+        dependentRow,
+        "sensitive",
+        Gio.SettingsBindFlags.GET,
+      );
+    }
+    page.add(rulesGroup);
+
+    // --- Advanced ---
+    const advancedGroup = new Adw.PreferencesGroup({
+      title: _("Advanced"),
+    });
     addSpin(
-      rules,
-      settings,
-      "emergency-hard-cap",
+      advancedGroup,
+      SettingKey.EmergencyHardCap,
       _("Emergency hard cap"),
-      _("Last-resort notification limit; zero disables it."),
+      _("Last-resort limit on tracked notifications even when other limits are disabled."),
       0,
       256,
       8,
     );
-    page.add(rules);
-
-    const panel = new Adw.PreferencesGroup({
-      title: _("Panel"),
-      description: _("Controls in the calendar notification list."),
-    });
     addSwitch(
-      panel,
-      settings,
-      "show-stats",
-      _("Show live stats"),
-      _("Display kept count and estimated memory in the panel."),
-    );
-    addSwitch(
-      panel,
-      settings,
-      "clear-on-panel-open",
-      _("Clear on panel open"),
-      _("Remove screenshot notifications when the calendar opens."),
-    );
-    page.add(panel);
-
-    const diagnostics = new Adw.PreferencesGroup({
-      title: _("Diagnostics"),
-    });
-    addSwitch(
-      diagnostics,
-      settings,
-      "debug-logging",
+      advancedGroup,
+      SettingKey.DebugLogging,
       _("Verbose logging"),
-      _("Write detailed tracking logs to the journal."),
+      _("Write detailed tracking logs to the system journal."),
     );
-    page.add(diagnostics);
+    page.add(advancedGroup);
+
+    const cleanup = (): void => {
+      if (disposed) return;
+      disposed = true;
+      if (statsTimerId !== null) {
+        GLib.source_remove(statsTimerId);
+        statsTimerId = null;
+      }
+      for (const id of signalIds) {
+        try {
+          settings.disconnect(id);
+        } catch {
+          // Already disconnected.
+        }
+      }
+      signalIds.length = 0;
+      for (const { target, property } of bindings) {
+        Gio.Settings.unbind(target as never, property);
+      }
+      bindings.length = 0;
+    };
+    window.connect("close-request", cleanup);
+    window.connect("destroy", cleanup);
 
     window.add(page);
   }

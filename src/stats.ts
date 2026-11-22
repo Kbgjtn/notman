@@ -1,13 +1,13 @@
-import type { NotificationHandle } from "./types.js";
+import type { CapabilityTier, NotificationHandle } from "./types.js";
 
 export interface StatsSnapshot {
-  activeCount: number;
-  estimatedBytes: number;
-  peakBytes: number;
-  prunedCount: number;
-  shellRssBytes: number;
-  adapterId: string;
-  tier: number;
+  readonly activeCount: number;
+  readonly estimatedBytes: number;
+  readonly peakBytes: number;
+  readonly prunedCount: number;
+  readonly shellRssBytes: number;
+  readonly adapterId: string;
+  readonly tier: CapabilityTier;
 }
 
 export class Stats {
@@ -19,7 +19,7 @@ export class Stats {
 
   constructor(
     private readonly _adapterId: string,
-    private readonly _tier: number,
+    private readonly _tier: CapabilityTier,
   ) {}
 
   update(handles: NotificationHandle[]): void {

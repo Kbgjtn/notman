@@ -1,13 +1,29 @@
 import type { Scheduler } from "../src/scheduler.js";
 import type { SettingsStore } from "../src/settings.js";
 import type { Bridge } from "../src/shell-bridge.js";
-import type { NotificationHandle, RuleContext, RuleSettings } from "../src/types.js";
+import {
+  type NotificationHandle,
+  type RuleContext,
+  type RuleSettings,
+  SourceKey,
+  ThumbnailMode,
+} from "../src/types.js";
 
-export function makeSettings(overrides: Partial<RuleSettings> = {}): RuleSettings {
+export interface MutableRuleSettings {
+  guardEnabled: boolean;
+  notifyEnabled: boolean;
+  thumbnailMode: ThumbnailMode;
+  maxCount: number;
+  expireSeconds: number;
+  memoryBudgetMb: number;
+  emergencyHardCap: number;
+}
+
+export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRuleSettings {
   return {
     guardEnabled: true,
     notifyEnabled: true,
-    thumbnailMode: "full",
+    thumbnailMode: ThumbnailMode.Full,
     maxCount: 0,
     expireSeconds: 0,
     memoryBudgetMb: 0,
@@ -21,7 +37,7 @@ export function makeContext(
   nowMs = 1_000_000,
   currentlyShownId: number | null = null,
 ): RuleContext {
-  return { nowMs, settings, currentlyShownId, log: () => {} };
+  return { nowMs, settings, currentlyShownId };
 }
 
 export class FakeHandle implements NotificationHandle {
@@ -37,7 +53,7 @@ export class FakeHandle implements NotificationHandle {
 
   constructor(
     readonly id: number,
-    readonly sourceKey: string,
+    readonly sourceKey: SourceKey,
     readonly receivedAtMs: number,
     estimatedBytes = 0,
     readonly isCritical = false,
@@ -84,17 +100,37 @@ export class FakeScheduler implements Scheduler {
   }
 }
 
-export function makeSettingsStore(settings: RuleSettings): SettingsStore {
+export function makeSettingsStore(
+  settings: MutableRuleSettings,
+): SettingsStore & { notify(): void } {
+  const listeners = new Set<() => void>();
+  const notify = (): void => {
+    for (const listener of [...listeners]) listener();
+  };
   const store = {
     read: () => settings,
+    onChanged: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    setGuardEnabled: (value: boolean) => {
+      settings.guardEnabled = value;
+      notify();
+    },
     setNotifyEnabled: (value: boolean) => {
       settings.notifyEnabled = value;
+      notify();
     },
     setMaxCount: (value: number) => {
       settings.maxCount = value;
+      notify();
     },
+    dispose: () => {
+      listeners.clear();
+    },
+    notify,
   };
-  return store as unknown as SettingsStore;
+  return store as unknown as SettingsStore & { notify(): void };
 }
 
 export function makeBridge(
@@ -102,10 +138,10 @@ export function makeBridge(
   byNotification: Map<unknown, number>,
 ): Bridge {
   return {
-    capabilities: { tray: true, panel: true },
+    capabilities: { tray: true, topBar: true, dateMenu: true },
     start: () => true,
-    sourceKeyFor: () => "screenshot",
-    getExistingScreenshotNotifications: () => [],
+    adoptExisting: () => {},
+    sourceKeyFor: () => SourceKey.Screenshot,
     makeHandle: (notification) => {
       const id = byNotification.get(notification) ?? handles.size + 1;
       const handle = handles.get(id);

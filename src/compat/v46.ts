@@ -50,21 +50,33 @@ export class V46Adapter implements ShellAdapter {
       getSources?: unknown;
       connect?: unknown;
     } | null;
-    const panel = (
-      Main.panel as unknown as {
-        statusArea?: { dateMenu?: { _messageList?: unknown } };
-      } | null
-    )?.statusArea?.dateMenu?._messageList;
+    const panel = Main.panel as unknown as {
+      addToStatusArea?: unknown;
+    } | null;
+    const dateMenu = this.getDateMenuMenu() as { connect?: unknown } | null;
     return {
       tray: !!tray && typeof tray.getSources === "function" && typeof tray.connect === "function",
-      panel: !!panel,
+      topBar: !!panel && typeof panel.addToStatusArea === "function",
+      dateMenu: !!dateMenu && typeof dateMenu.connect === "function",
     };
   }
 
   isScreenshotSource(source: unknown): boolean {
     if (!source || typeof source !== "object") return false;
-    // The icon is stable and locale-independent. The old title fallback also
-    // matched screencast notifications, which share the title "Screenshot".
-    return (source as { iconName?: unknown }).iconName === SCREENSHOT_ICON;
+    // In GNOME 46, MessageTray.Source turns constructor `iconName` into a
+    // Gio.ThemedIcon on `source.icon`, leaving `source.iconName` null.
+    const candidate = source as {
+      iconName?: unknown;
+      icon?: { get_names?: () => string[] } | null;
+    };
+    if (candidate.iconName === SCREENSHOT_ICON) return true;
+    if (candidate.icon && typeof candidate.icon.get_names === "function") {
+      try {
+        return candidate.icon.get_names().includes(SCREENSHOT_ICON);
+      } catch {
+        return false;
+      }
+    }
+    return false;
   }
 }

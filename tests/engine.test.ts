@@ -2,15 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import { Engine } from "../src/engine.js";
 import type { Bridge } from "../src/shell-bridge.js";
+import { CapabilityTier, SourceKey, ThumbnailMode } from "../src/types.js";
 import { FakeHandle, FakeScheduler, makeBridge, makeSettings, makeSettingsStore } from "./fakes.js";
 
 describe("Engine", () => {
   it("applies notifyEnabled=false on arrival, without waiting for a sweep", () => {
     const settings = makeSettings({ notifyEnabled: false });
-    const handle = new FakeHandle(1, "screenshot", 0);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
-    const engine = new Engine(makeSettingsStore(settings), bridge, "v46", 2, new FakeScheduler());
+    const engine = new Engine(
+      makeSettingsStore(settings),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
 
     engine.onNotificationAdded(notification);
 
@@ -28,7 +35,7 @@ describe("Engine", () => {
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -45,7 +52,7 @@ describe("Engine", () => {
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -54,14 +61,14 @@ describe("Engine", () => {
   });
 
   it("removes destroyed notifications from its tracking", () => {
-    const handle = new FakeHandle(1, "screenshot", 0);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
     const engine = new Engine(
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -73,14 +80,14 @@ describe("Engine", () => {
   });
 
   it("tolerates repeated destroy notifications for the same object", () => {
-    const handle = new FakeHandle(1, "screenshot", 0);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
     const engine = new Engine(
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -92,9 +99,9 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(0);
   });
 
-  it("clears only screenshot-sourced notifications and never twice", () => {
-    const shot = new FakeHandle(1, "screenshot", 0);
-    const other = new FakeHandle(2, "other", 0);
+  it("clears only screenshot-sourced notifications, updates stats immediately, and never clears twice", () => {
+    const shot = new FakeHandle(1, SourceKey.Screenshot, 0, 1024);
+    const other = new FakeHandle(2, SourceKey.Other, 0, 512);
     const notifications = new Map<unknown, number>([
       [{}, 1],
       [{}, 2],
@@ -108,43 +115,52 @@ describe("Engine", () => {
         ]),
         notifications,
       ),
-      sourceKeyFor: (notification) => (notification === shotNotification ? "screenshot" : "other"),
+      sourceKeyFor: (notification) =>
+        notification === shotNotification ? SourceKey.Screenshot : SourceKey.Other,
     };
     const engine = new Engine(
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
     engine.onNotificationAdded(shotNotification);
     engine.onNotificationAdded(otherNotification);
-    engine.clearScreenshots();
-    engine.clearScreenshots();
+    expect(engine.getStats().activeCount).toBe(2);
 
+    engine.clearScreenshots();
+    expect(engine.getStats().activeCount).toBe(1);
+    expect(engine.getStats().estimatedBytes).toBe(512);
+
+    engine.clearScreenshots();
     expect(shot.destroyCalls).toBe(1);
     expect(other.destroyed).toBe(false);
   });
 
-  it("re-evaluates existing handles when settings change", () => {
+  it("re-evaluates existing handles immediately when settings change", () => {
     const settings = makeSettings();
-    const handle = new FakeHandle(1, "screenshot", 0);
+    const store = makeSettingsStore(settings);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
-    const engine = new Engine(makeSettingsStore(settings), bridge, "v46", 2, new FakeScheduler());
+    const engine = new Engine(store, bridge, "v46", CapabilityTier.TopBar, new FakeScheduler());
 
+    engine.start();
     engine.onNotificationAdded(notification);
     expect(handle.destroyed).toBe(false);
 
-    engine.setEnabled(false);
+    settings.notifyEnabled = false;
+    store.notify();
     expect(handle.destroyed).toBe(true);
+    expect(engine.getStats().activeCount).toBe(0);
   });
 
   it("tracks peak bytes, pruned count and adapter metadata", () => {
     const settings = makeSettings({ maxCount: 1 });
-    const first = new FakeHandle(1, "screenshot", 1, 1024);
-    const second = new FakeHandle(2, "screenshot", 2, 2048);
+    const first = new FakeHandle(1, SourceKey.Screenshot, 1, 1024);
+    const second = new FakeHandle(2, SourceKey.Screenshot, 2, 2048);
     const notifications = new Map<unknown, number>([
       [{}, 1],
       [{}, 2],
@@ -157,7 +173,13 @@ describe("Engine", () => {
       ]),
       notifications,
     );
-    const engine = new Engine(makeSettingsStore(settings), bridge, "v46", 2, new FakeScheduler());
+    const engine = new Engine(
+      makeSettingsStore(settings),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
 
     engine.onNotificationAdded(firstNotification);
     engine.onNotificationAdded(secondNotification);
@@ -166,18 +188,18 @@ describe("Engine", () => {
     expect(stats.peakBytes).toBe(2048);
     expect(stats.prunedCount).toBe(1);
     expect(stats.adapterId).toBe("v46");
-    expect(stats.tier).toBe(2);
+    expect(stats.tier).toBe(CapabilityTier.TopBar);
   });
 
   it("clears tracking on stop", () => {
-    const handle = new FakeHandle(1, "screenshot", 0);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
     const engine = new Engine(
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -193,26 +215,28 @@ describe("Engine", () => {
       makeSettingsStore(settings),
       makeBridge(new Map(), new Map()),
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
-    engine.setEnabled(false);
+    engine.setGuardEnabled(false);
+    engine.setNotifyEnabled(false);
     engine.setMaxCount(7);
 
+    expect(settings.guardEnabled).toBe(false);
     expect(settings.notifyEnabled).toBe(false);
     expect(settings.maxCount).toBe(7);
   });
 
   it("reports zero estimated bytes after a text-only downgrade", () => {
-    const handle = new FakeHandle(1, "screenshot", 0, 1024);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0, 1024);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
     const engine = new Engine(
-      makeSettingsStore(makeSettings({ thumbnailMode: "text-only" })),
+      makeSettingsStore(makeSettings({ thumbnailMode: ThumbnailMode.TextOnly })),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -222,22 +246,29 @@ describe("Engine", () => {
     expect(engine.getStats().estimatedBytes).toBe(0);
   });
 
-  it("adopts notifications that were never signalled", () => {
-    const handle = new FakeHandle(1, "screenshot", 0);
+  it("adopts notifications via bridge.adoptExisting during sweep", () => {
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};
+    let addedCb: ((n: unknown) => void) | null = null;
     const bridge: Bridge = {
-      ...makeBridge(new Map([[1, handle]]), new Map()),
-      getExistingScreenshotNotifications: () => [notification],
-      makeHandle: () => handle,
+      ...makeBridge(new Map([[1, handle]]), new Map([[notification, 1]])),
+      start: (onAdded) => {
+        addedCb = onAdded;
+        return true;
+      },
+      adoptExisting: () => {
+        addedCb?.(notification);
+      },
     };
     const engine = new Engine(
       makeSettingsStore(makeSettings()),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
+    engine.start();
     engine.sweep();
 
     expect(engine.getStats().activeCount).toBe(1);
@@ -249,14 +280,17 @@ describe("Engine", () => {
       read: () => {
         throw new Error("schema missing");
       },
+      onChanged: () => () => {},
+      setGuardEnabled: () => {},
       setNotifyEnabled: () => {},
       setMaxCount: () => {},
+      dispose: () => {},
     };
     const engine = new Engine(
       brokenStore as never,
       makeBridge(new Map(), new Map()),
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 
@@ -267,8 +301,8 @@ describe("Engine", () => {
   it("applies expiry and max-count rules across scheduled sweeps", () => {
     const now = Date.now();
     const settings = makeSettings({ expireSeconds: 10, maxCount: 1 });
-    const old = new FakeHandle(1, "screenshot", now - 20_000);
-    const fresh = new FakeHandle(2, "screenshot", now);
+    const old = new FakeHandle(1, SourceKey.Screenshot, now - 20_000);
+    const fresh = new FakeHandle(2, SourceKey.Screenshot, now);
     const notifications = new Map<unknown, number>([
       [{}, 1],
       [{}, 2],
@@ -282,7 +316,13 @@ describe("Engine", () => {
       notifications,
     );
     const scheduler = new FakeScheduler();
-    const engine = new Engine(makeSettingsStore(settings), bridge, "v46", 2, scheduler);
+    const engine = new Engine(
+      makeSettingsStore(settings),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      scheduler,
+    );
 
     engine.onNotificationAdded(oldNotification);
     engine.onNotificationAdded(freshNotification);
@@ -295,14 +335,14 @@ describe("Engine", () => {
   });
 
   it("does not count a failed destroy as pruned", () => {
-    const handle = new FakeHandle(1, "screenshot", 0, 0, false, false, true, true);
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0, 0, false, false, true, true);
     const notification = {};
     const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
     const engine = new Engine(
       makeSettingsStore(makeSettings({ notifyEnabled: false })),
       bridge,
       "v46",
-      2,
+      CapabilityTier.TopBar,
       new FakeScheduler(),
     );
 

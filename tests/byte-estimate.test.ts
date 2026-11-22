@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { estimateContentBytes } from "../src/byte-estimate.js";
+import { estimateContentBytes, formatMiB, MiB } from "../src/byte-estimate.js";
 
 describe("estimateContentBytes", () => {
   it("reads the Clutter.Content triple [success, width, height]", () => {
@@ -36,5 +36,12 @@ describe("estimateContentBytes", () => {
         },
       }),
     ).toBe(0);
+  });
+
+  it("formats bytes in MiB", () => {
+    expect(MiB).toBe(1024 * 1024);
+    expect(formatMiB(0)).toBe("0.0 MiB");
+    expect(formatMiB(2.5 * MiB)).toBe("2.5 MiB");
+    expect(formatMiB(-100)).toBe("0.0 MiB");
   });
 });

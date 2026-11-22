@@ -5,7 +5,13 @@ import type { Scheduler } from "./scheduler.js";
 import type { SettingsStore } from "./settings.js";
 import type { Bridge } from "./shell-bridge.js";
 import { Stats, type StatsSnapshot } from "./stats.js";
-import type { NotificationHandle, Rule, RuleContext } from "./types.js";
+import {
+  type CapabilityTier,
+  type NotificationHandle,
+  type Rule,
+  type RuleContext,
+  SourceKey,
+} from "./types.js";
 
 const SWEEP_INTERVAL_MS = 1000;
 
@@ -15,6 +21,7 @@ export class Engine {
   private readonly _pending = new Set<number>();
   private readonly _stats: Stats;
   private _sweepId: number | null = null;
+  private _unsubscribeSettings: (() => void) | null = null;
   private _started = false;
   private _sweeping = false;
 
@@ -22,7 +29,7 @@ export class Engine {
     private readonly _settings: SettingsStore,
     private readonly _bridge: Bridge,
     adapterId: string,
-    tier: number,
+    tier: CapabilityTier,
     private readonly _scheduler: Scheduler,
   ) {
     this._stats = new Stats(adapterId, tier);
@@ -36,6 +43,7 @@ export class Engine {
     );
     if (!started) return false;
     this._started = true;
+    this._unsubscribeSettings = this._settings.onChanged(() => this.sweep());
     this._sweepId = this._scheduler.every(SWEEP_INTERVAL_MS, () => {
       this.sweep();
     });
@@ -43,6 +51,10 @@ export class Engine {
   }
 
   stop(): void {
+    if (this._unsubscribeSettings) {
+      this._unsubscribeSettings();
+      this._unsubscribeSettings = null;
+    }
     if (this._sweepId !== null) {
       this._scheduler.cancel(this._sweepId);
       this._sweepId = null;
@@ -73,25 +85,15 @@ export class Engine {
     this._stats.update([...this._handles.values()]);
   }
 
-  /** Pull-based fallback in case a source-added signal was missed. */
-  private adoptExisting(): void {
-    for (const notification of this._bridge.getExistingScreenshotNotifications()) {
-      if (this._bridge.idFor(notification) !== null) continue;
-      log.debug("engine", "adopting pre-existing notification");
-      this.onNotificationAdded(notification, true);
-    }
-  }
-
   sweep(): void {
     if (this._sweeping) return;
     this._sweeping = true;
     try {
-      this.adoptExisting();
+      this._bridge.adoptExisting();
       const context: RuleContext = {
         nowMs: Date.now(),
         settings: this._settings.read(),
         currentlyShownId: this._bridge.currentlyShownId(),
-        log: (message) => log.info("rule", message),
       };
       for (const rule of this._rules) {
         // Rules may destroy handles, so each one sees the surviving set.
@@ -139,11 +141,17 @@ export class Engine {
 
   clearScreenshots(): void {
     for (const handle of [...this._handles.values()]) {
-      if (handle.sourceKey === "screenshot") this.destroyHandle(handle);
+      if (handle.sourceKey === SourceKey.Screenshot) this.destroyHandle(handle);
     }
+    this._stats.update([...this._handles.values()]);
   }
 
-  setEnabled(enabled: boolean): void {
+  setGuardEnabled(enabled: boolean): void {
+    this._settings.setGuardEnabled(enabled);
+    this.sweep();
+  }
+
+  setNotifyEnabled(enabled: boolean): void {
     this._settings.setNotifyEnabled(enabled);
     this.sweep();
   }

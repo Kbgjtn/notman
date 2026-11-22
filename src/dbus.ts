@@ -4,33 +4,43 @@ import GLib from "gi://GLib";
 import type { Disposables } from "./disposables.js";
 import type { Engine } from "./engine.js";
 import { log } from "./log.js";
-import { clampInt } from "./ui/mappings.js";
 
-const BUS_NAME = "org.gnome.Shell.Extensions.Notman";
-const OBJECT_PATH = "/org/gnome/Shell/Extensions/Notman";
+export const DBUS_BUS_NAME = "org.gnome.Shell.Extensions.Notman";
+export const DBUS_OBJECT_PATH = "/org/gnome/Shell/Extensions/Notman";
+
+export enum DbusMethod {
+  GetStats = "GetStats",
+  ClearScreenshots = "ClearScreenshots",
+  SetGuardEnabled = "SetGuardEnabled",
+  SetScreenshotNotifyEnabled = "SetScreenshotNotifyEnabled",
+  SetMaxCount = "SetMaxCount",
+}
 
 const XML = `
 <node>
-  <interface name="${BUS_NAME}">
-    <method name="GetStats">
+  <interface name="${DBUS_BUS_NAME}">
+    <method name="${DbusMethod.GetStats}">
       <arg type="a{sv}" name="stats" direction="out"/>
     </method>
-    <method name="ClearScreenshots"/>
-    <method name="SetEnabled">
+    <method name="${DbusMethod.ClearScreenshots}"/>
+    <method name="${DbusMethod.SetGuardEnabled}">
       <arg type="b" name="enabled" direction="in"/>
     </method>
-    <method name="SetMaxCount">
+    <method name="${DbusMethod.SetScreenshotNotifyEnabled}">
+      <arg type="b" name="enabled" direction="in"/>
+    </method>
+    <method name="${DbusMethod.SetMaxCount}">
       <arg type="i" name="count" direction="in"/>
     </method>
   </interface>
 </node>`;
 
-/** Exposes the screenshot rule to scripts. Returns true on success. */
+/** Exposes the screenshot rule to scripts and preferences. Returns true on success. */
 export function registerDbus(engine: Engine, disposables: Disposables): boolean {
   let interfaceInfo: Gio.DBusInterfaceInfo;
   try {
     const node = Gio.DBusNodeInfo.new_for_xml(XML);
-    const lookedUp = node.lookup_interface(BUS_NAME);
+    const lookedUp = node.lookup_interface(DBUS_BUS_NAME);
     if (!lookedUp) throw new Error("interface missing from generated node info");
     interfaceInfo = lookedUp;
   } catch (e) {
@@ -43,14 +53,14 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
   try {
     ownerId = Gio.bus_own_name(
       Gio.BusType.SESSION,
-      BUS_NAME,
+      DBUS_BUS_NAME,
       Gio.BusNameOwnerFlags.NONE,
       (connection) => {
         // bus_acquired is asynchronous; teardown may have happened already.
         if (stopped) return;
         try {
           const registrationId = connection.register_object(
-            OBJECT_PATH,
+            DBUS_OBJECT_PATH,
             interfaceInfo,
             (
               _connection: Gio.DBusConnection,
@@ -63,7 +73,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
             ) => {
               try {
                 switch (method) {
-                  case "GetStats": {
+                  case DbusMethod.GetStats: {
                     const stats = engine.getStats();
                     const dict: Record<string, GLib.Variant> = {
                       activeCount: new GLib.Variant("i", stats.activeCount),
@@ -80,21 +90,25 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
                     );
                     break;
                   }
-                  case "ClearScreenshots":
+                  case DbusMethod.ClearScreenshots:
                     engine.clearScreenshots();
                     invocation.return_value(null);
                     break;
-                  // SetEnabled and SetMaxCount write to GSettings, so changes
-                  // made here persist across shell restarts.
-                  case "SetEnabled": {
+                  case DbusMethod.SetGuardEnabled: {
                     const [enabled] = params.deepUnpack() as [boolean];
-                    engine.setEnabled(enabled);
+                    engine.setGuardEnabled(enabled);
                     invocation.return_value(null);
                     break;
                   }
-                  case "SetMaxCount": {
+                  case DbusMethod.SetScreenshotNotifyEnabled: {
+                    const [enabled] = params.deepUnpack() as [boolean];
+                    engine.setNotifyEnabled(enabled);
+                    invocation.return_value(null);
+                    break;
+                  }
+                  case DbusMethod.SetMaxCount: {
                     const [count] = params.deepUnpack() as [number];
-                    engine.setMaxCount(clampInt(count, 0, 100, 3));
+                    engine.setMaxCount(count);
                     invocation.return_value(null);
                     break;
                   }

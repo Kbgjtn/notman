@@ -1,9 +1,12 @@
+import { MiB } from "../byte-estimate.js";
 import {
   emptyOutcome,
   type NotificationHandle,
   type Rule,
   type RuleContext,
   type RuleOutcome,
+  SourceKey,
+  ThumbnailMode,
 } from "../types.js";
 
 /** Retention, expiry, thumbnail and memory rules for screenshot sources. */
@@ -17,7 +20,7 @@ export class ScreenshotRule implements Rule {
 
     const shots = handles.filter(
       (h) =>
-        h.sourceKey === "screenshot" &&
+        h.sourceKey === SourceKey.Screenshot &&
         !h.isCritical &&
         !h.forFeedback &&
         h.id !== context.currentlyShownId,
@@ -29,39 +32,41 @@ export class ScreenshotRule implements Rule {
       return outcome;
     }
 
-    if (settings.thumbnailMode === "text-only") {
-      for (const handle of shots) {
-        if (!handle.isDowngraded()) outcome.downgrade.push(handle);
-      }
-    }
-
     const oldestFirst = [...shots].sort((a, b) => a.receivedAtMs - b.receivedAtMs);
+    const destroySet = new Set<NotificationHandle>();
 
     if (settings.expireSeconds > 0) {
       const cutoff = context.nowMs - settings.expireSeconds * 1000;
       for (const handle of oldestFirst) {
-        if (handle.receivedAtMs <= cutoff) outcome.destroy.push(handle);
+        if (handle.receivedAtMs <= cutoff) destroySet.add(handle);
       }
     }
 
-    if (settings.maxCount > 0 && shots.length > settings.maxCount) {
-      outcome.destroy.push(...oldestFirst.slice(0, shots.length - settings.maxCount));
+    if (settings.maxCount > 0 && oldestFirst.length > settings.maxCount) {
+      for (const handle of oldestFirst.slice(0, oldestFirst.length - settings.maxCount)) {
+        destroySet.add(handle);
+      }
     }
 
-    if (settings.memoryBudgetMb > 0) {
-      const limit = settings.memoryBudgetMb * 1024 * 1024;
-      const downgrading = new Set(outcome.downgrade);
-      const bytesOf = (h: NotificationHandle): number =>
-        downgrading.has(h) ? 0 : h.estimatedBytes;
-      let total = shots.reduce((sum, h) => sum + bytesOf(h), 0);
-      for (const handle of oldestFirst) {
+    const willDowngradeAll = settings.thumbnailMode === ThumbnailMode.TextOnly;
+    if (settings.memoryBudgetMb > 0 && !willDowngradeAll) {
+      const limit = settings.memoryBudgetMb * MiB;
+      const surviving = oldestFirst.filter((h) => !destroySet.has(h));
+      let total = surviving.reduce((sum, h) => sum + h.estimatedBytes, 0);
+      for (const handle of surviving) {
         if (total <= limit) break;
-        if (!outcome.destroy.includes(handle)) outcome.destroy.push(handle);
-        total -= bytesOf(handle);
+        destroySet.add(handle);
+        total -= handle.estimatedBytes;
       }
     }
 
-    outcome.destroy = [...new Set(outcome.destroy)];
+    if (willDowngradeAll) {
+      for (const handle of oldestFirst) {
+        if (!destroySet.has(handle) && !handle.isDowngraded()) outcome.downgrade.push(handle);
+      }
+    }
+
+    outcome.destroy = [...destroySet];
     return outcome;
   }
 }

@@ -1,18 +1,36 @@
-export type ThumbnailMode = "full" | "text-only";
+export enum ThumbnailMode {
+  Full = "full",
+  TextOnly = "text-only",
+}
+
+export enum SourceKey {
+  Screenshot = "screenshot",
+  Other = "other",
+}
+
+export enum CapabilityTier {
+  Headless = 1,
+  TopBar = 2,
+}
+
+export interface SignalEmitter {
+  connect(signal: string, callback: (...args: unknown[]) => void): number;
+  disconnect(id: number): void;
+}
 
 export interface RuleSettings {
-  guardEnabled: boolean;
-  notifyEnabled: boolean;
-  thumbnailMode: ThumbnailMode;
-  maxCount: number;
-  expireSeconds: number;
-  memoryBudgetMb: number;
-  emergencyHardCap: number;
+  readonly guardEnabled: boolean;
+  readonly notifyEnabled: boolean;
+  readonly thumbnailMode: ThumbnailMode;
+  readonly maxCount: number;
+  readonly expireSeconds: number;
+  readonly memoryBudgetMb: number;
+  readonly emergencyHardCap: number;
 }
 
 export interface NotificationHandle {
   readonly id: number;
-  readonly sourceKey: string;
+  readonly sourceKey: SourceKey;
   readonly receivedAtMs: number;
   readonly estimatedBytes: number;
   readonly isCritical: boolean;
@@ -23,10 +41,9 @@ export interface NotificationHandle {
 }
 
 export interface RuleContext {
-  nowMs: number;
-  settings: RuleSettings;
-  currentlyShownId: number | null;
-  log(message: string): void;
+  readonly nowMs: number;
+  readonly settings: RuleSettings;
+  readonly currentlyShownId: number | null;
 }
 
 export interface RuleOutcome {

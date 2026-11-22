@@ -6,12 +6,7 @@ import { estimateContentBytes } from "./byte-estimate.js";
 import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
 import type { Disposables } from "./disposables.js";
 import { log } from "./log.js";
-import type { NotificationHandle } from "./types.js";
-
-type SignalEmitter = {
-  connect(signal: string, callback: (...args: unknown[]) => void): number;
-  disconnect(id: number): void;
-};
+import { type NotificationHandle, type SignalEmitter, SourceKey } from "./types.js";
 
 type TrayLike = SignalEmitter & { getSources(): unknown[] };
 
@@ -29,119 +24,206 @@ export interface Bridge {
     onAdded: (notification: unknown) => void,
     onDestroyed: (notification: unknown) => void,
   ): boolean;
-  sourceKeyFor(notification: unknown): string;
-  getExistingScreenshotNotifications(): unknown[];
-  makeHandle(notification: unknown, sourceKey: string): NotificationHandle | null;
+  adoptExisting(): void;
+  sourceKeyFor(notification: unknown): SourceKey;
+  makeHandle(notification: unknown, sourceKey: SourceKey): NotificationHandle | null;
   idFor(notification: unknown): number | null;
   currentlyShownId(): number | null;
   readRssBytes(): number;
   stop(): void;
 }
 
-export function createBridge(
-  adapter: ShellAdapter,
-  capabilities: AdapterCapabilities,
-  disposables: Disposables,
-): Bridge | null {
-  const tray = Main.messageTray as unknown as TrayLike | null;
-  if (!capabilities.tray || !tray || typeof tray.getSources !== "function") return null;
+function decodeUtf8(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    let text = "";
+    for (const byte of bytes) text += String.fromCharCode(byte);
+    return text;
+  }
+}
 
-  const ids = new WeakMap<object, number>();
-  const destroyed = new WeakSet<object>();
-  const downgraded = new WeakSet<object>();
-  const seenSources = new WeakSet<object>();
-  const attachedNotifications = new WeakSet<object>();
-  const pendingDestroys = new Set<number>();
-  let nextId = 1;
-  let stopped = false;
+export class ShellBridge implements Bridge {
+  private readonly _ids = new WeakMap<object, number>();
+  private readonly _destroyed = new WeakSet<object>();
+  private readonly _downgraded = new WeakSet<object>();
+  private readonly _seenSources = new WeakSet<object>();
+  private readonly _attachedNotifications = new WeakSet<object>();
+  private readonly _pendingDestroys = new Set<number>();
+  private _nextId = 1;
+  private _stopped = false;
+  private _onAdded: ((notification: unknown) => void) | null = null;
+  private _onDestroyed: ((notification: unknown) => void) | null = null;
 
-  const idFor = (notification: unknown): number | null => {
+  private constructor(
+    private readonly _tray: TrayLike,
+    private readonly _adapter: ShellAdapter,
+    readonly capabilities: AdapterCapabilities,
+    private readonly _disposables: Disposables,
+  ) {}
+
+  static create(
+    adapter: ShellAdapter,
+    capabilities: AdapterCapabilities,
+    disposables: Disposables,
+  ): ShellBridge | null {
+    const tray = Main.messageTray as unknown as TrayLike | null;
+    if (!capabilities.tray || !tray || typeof tray.getSources !== "function") return null;
+    return new ShellBridge(tray, adapter, capabilities, disposables);
+  }
+
+  start(
+    onAdded: (notification: unknown) => void,
+    onDestroyed: (notification: unknown) => void,
+  ): boolean {
+    this._onAdded = onAdded;
+    this._onDestroyed = onDestroyed;
+    log.debug("bridge", `start sources=${this._tray.getSources().length}`);
+
+    const sourceAddedId = this._tray.connect(
+      this._adapter.signals.sourceAdded,
+      (...args: unknown[]) => {
+        log.debug("bridge", "source-added signal received");
+        // GJS passes the emitter as args[0]; the source is args[1].
+        this.observeSource(args[1]);
+      },
+    );
+    this._disposables.add(() => {
+      try {
+        this._tray.disconnect(sourceAddedId);
+      } catch {
+        // Tray may already be gone.
+      }
+    });
+
+    for (const source of this._tray.getSources()) this.observeSource(source);
+    return true;
+  }
+
+  adoptExisting(): void {
+    if (this._stopped || !this._onAdded || !this._onDestroyed) return;
+    for (const source of this._tray.getSources()) this.observeSource(source);
+  }
+
+  sourceKeyFor(notification: unknown): SourceKey {
+    if (!notification || typeof notification !== "object") return SourceKey.Other;
+    const source = (notification as { source?: unknown }).source;
+    return this._adapter.isScreenshotSource(source) ? SourceKey.Screenshot : SourceKey.Other;
+  }
+
+  idFor(notification: unknown): number | null {
     if (!notification || typeof notification !== "object") return null;
-    return ids.get(notification) ?? null;
-  };
+    return this._ids.get(notification) ?? null;
+  }
 
-  const decode = (bytes: Uint8Array): string => {
-    try {
-      return new TextDecoder("utf-8").decode(bytes);
-    } catch {
-      let text = "";
-      for (const byte of bytes) text += String.fromCharCode(byte);
-      return text;
-    }
-  };
-
-  const makeHandle = (notification: unknown, sourceKey: string): NotificationHandle | null => {
+  makeHandle(notification: unknown, sourceKey: SourceKey): NotificationHandle | null {
     if (!notification || typeof notification !== "object") return null;
     const target = notification as NotificationLike;
-    let id = ids.get(target);
+    let id = this._ids.get(target);
     if (id === undefined) {
-      id = nextId++;
-      ids.set(target, id);
+      id = this._nextId++;
+      this._ids.set(target, id);
     }
+
     const estimatedBytes = estimateContentBytes(target.gicon);
+    const isCritical = target.urgency === this._adapter.criticalUrgency();
+    const downgraded = this._downgraded;
     log.debug(
       "bridge",
-      `handle id=${id} sourceKey=${sourceKey} bytes=${estimatedBytes} critical=${target.urgency === adapter.criticalUrgency()}`,
+      `handle id=${id} sourceKey=${sourceKey} bytes=${estimatedBytes} critical=${isCritical}`,
     );
+
     return {
       id,
       sourceKey,
       receivedAtMs: Date.now(),
-      get estimatedBytes() {
+      get estimatedBytes(): number {
         return downgraded.has(target) ? 0 : estimatedBytes;
       },
-      isCritical: target.urgency === adapter.criticalUrgency(),
-      forFeedback: !!target.forFeedback,
-      isDowngraded: () => downgraded.has(target),
-      downgrade: () => {
-        if (downgraded.has(target)) return;
+      isCritical,
+      forFeedback: Boolean(target.forFeedback),
+      isDowngraded: (): boolean => this._downgraded.has(target),
+      downgrade: (): void => {
+        if (this._downgraded.has(target)) return;
         try {
-          target.gicon = new Gio.ThemedIcon({
-            name: "screenshot-recorded-symbolic",
-          });
-          downgraded.add(target);
+          target.gicon = new Gio.ThemedIcon({ name: "screenshot-recorded-symbolic" });
+          this._downgraded.add(target);
         } catch (e) {
           log.err("bridge", "could not downgrade thumbnail", e);
         }
       },
-      destroy: () => {
-        if (destroyed.has(target) || stopped) return false;
+      destroy: (): boolean => {
+        if (this._destroyed.has(target) || this._stopped) return false;
         log.debug("bridge", `destroy scheduled for id=${id}`);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
-          pendingDestroys.delete(sourceId);
+          this._pendingDestroys.delete(sourceId);
           try {
-            target.destroy(adapter.dismissedReason());
+            target.destroy(this._adapter.dismissedReason());
           } catch (e) {
             log.err("bridge", "could not destroy notification", e);
           }
           return GLib.SOURCE_REMOVE;
         });
         if (sourceId === 0) return false;
-        destroyed.add(target);
-        pendingDestroys.add(sourceId);
+        this._destroyed.add(target);
+        this._pendingDestroys.add(sourceId);
         return true;
       },
     };
-  };
+  }
 
-  const attachNotification = (
-    notification: unknown,
-    onAdded: (notification: unknown) => void,
-    onDestroyed: (notification: unknown) => void,
-  ): void => {
-    if (!notification || typeof notification !== "object") return;
-    if (attachedNotifications.has(notification)) return;
+  currentlyShownId(): number | null {
+    for (const notification of this._adapter.getActiveNotifications()) {
+      const id = this.idFor(notification);
+      if (id !== null) return id;
+    }
+    return null;
+  }
+
+  readRssBytes(): number {
+    try {
+      const [ok, contents] = Gio.File.new_for_path("/proc/self/status").load_contents(null);
+      if (!ok) return 0;
+      const match = /^VmRSS:\s+(\d+)\s+kB/m.exec(decodeUtf8(contents));
+      return match ? Number(match[1]) * 1024 : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  stop(): void {
+    this._stopped = true;
+    this._onAdded = null;
+    this._onDestroyed = null;
+    for (const id of this._pendingDestroys) {
+      try {
+        GLib.source_remove(id);
+      } catch {
+        // Already fired.
+      }
+    }
+    this._pendingDestroys.clear();
+  }
+
+  private attachNotification(notification: unknown): void {
+    if (!notification || typeof notification !== "object" || !this._onAdded || !this._onDestroyed) {
+      return;
+    }
+    if (this._attachedNotifications.has(notification)) return;
     const emitter = notification as SignalEmitter;
     if (typeof emitter.connect !== "function") return;
-    attachedNotifications.add(notification);
+    this._attachedNotifications.add(notification);
 
-    const source = (notification as { source?: unknown }).source;
+    const onAdded = this._onAdded;
+    const onDestroyed = this._onDestroyed;
+    const sourceKey = this.sourceKeyFor(notification);
     log.debug(
       "bridge",
-      `notification attached sourceKey=${adapter.isScreenshotSource(source) ? "screenshot" : "other"} bytes=${estimateContentBytes((notification as { gicon?: unknown }).gicon)}`,
+      `notification attached sourceKey=${sourceKey} bytes=${estimateContentBytes((notification as { gicon?: unknown }).gicon)}`,
     );
-    const signalId = emitter.connect(adapter.signals.destroy, () => {
-      disposables.remove(dispose);
+
+    const signalId = emitter.connect(this._adapter.signals.destroy, () => {
+      this._disposables.remove(dispose);
       onDestroyed(notification);
     });
     const dispose = (): void => {
@@ -151,114 +233,60 @@ export function createBridge(
         // Notification may already be gone.
       }
     };
-    disposables.add(dispose);
+    this._disposables.add(dispose);
     onAdded(notification);
-  };
+  }
 
-  const observeSource = (
-    source: unknown,
-    onAdded: (notification: unknown) => void,
-    onDestroyed: (notification: unknown) => void,
-  ): void => {
-    if (!source || typeof source !== "object" || seenSources.has(source)) return;
-    seenSources.add(source);
-    const matches = adapter.isScreenshotSource(source);
-    log.debug(
-      "bridge",
-      `source title=${String((source as { title?: unknown }).title)} iconName=${String((source as { iconName?: unknown }).iconName)} screenshot=${matches}`,
-    );
-    if (!matches) return;
-    const emitter = source as SignalEmitter;
-    if (typeof emitter.connect !== "function") return;
+  private observeSource(source: unknown): void {
+    if (!source || typeof source !== "object") return;
+    const matches = this._adapter.isScreenshotSource(source);
+    if (!this._seenSources.has(source)) {
+      this._seenSources.add(source);
+      log.debug(
+        "bridge",
+        `source title=${String((source as { title?: unknown }).title)} iconName=${String((source as { iconName?: unknown }).iconName)} screenshot=${matches}`,
+      );
+      if (!matches) return;
 
-    const signalId = emitter.connect(adapter.signals.notificationAdded, (...args: unknown[]) => {
-      // GJS passes the emitter as args[0]; the notification is args[1].
-      attachNotification(args[1], onAdded, onDestroyed);
-    });
-    disposables.add(() => {
-      try {
-        emitter.disconnect(signalId);
-      } catch {
-        // Source may already be gone.
+      const emitter = source as SignalEmitter;
+      if (typeof emitter.connect === "function") {
+        let addedId: number | null = emitter.connect(
+          this._adapter.signals.notificationAdded,
+          (...args: unknown[]) => {
+            // GJS passes the emitter as args[0]; the notification is args[1].
+            this.attachNotification(args[1]);
+          },
+        );
+        let destroyId: number | null = null;
+        const disposeSource = (): void => {
+          this._disposables.remove(disposeSource);
+          if (addedId !== null) {
+            try {
+              emitter.disconnect(addedId);
+            } catch {
+              // Source may already be gone.
+            }
+            addedId = null;
+          }
+          if (destroyId !== null) {
+            try {
+              emitter.disconnect(destroyId);
+            } catch {
+              // Source may already be gone.
+            }
+            destroyId = null;
+          }
+        };
+        destroyId = emitter.connect(this._adapter.signals.destroy, disposeSource);
+        this._disposables.add(disposeSource);
       }
-    });
+    } else if (!matches) {
+      return;
+    }
 
-    // Adopt notifications that existed before the extension was enabled.
     const existing = (source as { notifications?: unknown[] }).notifications;
     if (Array.isArray(existing)) {
-      for (const notification of existing) attachNotification(notification, onAdded, onDestroyed);
+      for (const notification of existing) this.attachNotification(notification);
     }
-  };
-
-  return {
-    capabilities,
-
-    start(onAdded, onDestroyed) {
-      log.debug("bridge", `start sources=${tray.getSources().length}`);
-      const sourceAddedId = tray.connect(adapter.signals.sourceAdded, (...args: unknown[]) => {
-        log.debug("bridge", "source-added signal received");
-        // GJS passes the emitter as args[0]; the source is args[1].
-        observeSource(args[1], onAdded, onDestroyed);
-      });
-      disposables.add(() => {
-        try {
-          tray.disconnect(sourceAddedId);
-        } catch {
-          // Tray may already be gone.
-        }
-      });
-      for (const source of tray.getSources()) observeSource(source, onAdded, onDestroyed);
-      return true;
-    },
-
-    sourceKeyFor(notification) {
-      if (!notification || typeof notification !== "object") return "other";
-      const source = (notification as { source?: unknown }).source;
-      return adapter.isScreenshotSource(source) ? "screenshot" : "other";
-    },
-
-    getExistingScreenshotNotifications() {
-      const found: unknown[] = [];
-      for (const source of tray.getSources()) {
-        if (!adapter.isScreenshotSource(source)) continue;
-        const notifications = (source as { notifications?: unknown[] }).notifications;
-        if (Array.isArray(notifications)) found.push(...notifications);
-      }
-      return found;
-    },
-
-    makeHandle,
-    idFor,
-
-    currentlyShownId() {
-      for (const notification of adapter.getActiveNotifications()) {
-        const id = idFor(notification);
-        if (id !== null) return id;
-      }
-      return null;
-    },
-
-    readRssBytes() {
-      try {
-        const [ok, contents] = Gio.File.new_for_path("/proc/self/status").load_contents(null);
-        if (!ok) return 0;
-        const match = /^VmRSS:\s+(\d+)\s+kB/m.exec(decode(contents));
-        return match ? Number(match[1]) * 1024 : 0;
-      } catch {
-        return 0;
-      }
-    },
-
-    stop() {
-      stopped = true;
-      for (const id of pendingDestroys) {
-        try {
-          GLib.source_remove(id);
-        } catch {
-          // Already fired.
-        }
-      }
-      pendingDestroys.clear();
-    },
-  };
+  }
 }

@@ -84,12 +84,13 @@ the path that exists in the compiled shell resources.
 ```sh
 make             # compile TypeScript into dist/
 make check       # schema, imports, scripts, lint, unit tests, typecheck
+make qa-xvfb     # isolated GNOME Shell 46 smoke test (private Xvfb + D-Bus)
 make dev-install # symlink dist/ into ~/.local/share/gnome-shell/extensions/
 gnome-extensions enable notman@ozy.local
 ```
 
-On X11, reload with `Alt+F2` → `r`. If the shell UI becomes unusable, the
-extension can be disabled over D-Bus without it:
+On X11, reload with `Alt+F2` → `r` (on Wayland, log out and back in). If the
+shell UI becomes unusable, the extension can be disabled over D-Bus without it:
 
 ```sh
 gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
@@ -136,9 +137,10 @@ resolution and GLib GC affect the shell's baseline between runs.
 ## Layout
 
 ```
-extension.ts, prefs.ts       thin compiled entry points
-src/                          bridge, compat adapters, rules, engine, UI, D-Bus
+extension.ts, prefs.ts       entry points (shell lifecycle and GTK4/Adw prefs)
+src/                          bridge, compat adapters, rules, engine, tray UI, D-Bus
 schemas/                      GSettings schema
-tools/                        bounded baseline and case-matrix harness
+tests/                        Vitest unit tests
+tools/                        isolated Xvfb QA and bounded benchmark harness
 dist/                         generated, gitignored
 ```

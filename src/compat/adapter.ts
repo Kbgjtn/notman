@@ -1,8 +1,11 @@
+import * as Config from "resource:///org/gnome/shell/misc/config.js";
+
 import { V46Adapter } from "./v46.js";
 
 export interface AdapterCapabilities {
   tray: boolean;
-  panel: boolean;
+  topBar: boolean;
+  dateMenu: boolean;
 }
 
 export interface ShellAdapter {
@@ -21,11 +24,8 @@ export interface ShellAdapter {
   getDateMenuMenu(): unknown;
 }
 
-/**
- * Version comes from metadata.json, never from a runtime config module:
- * the shell does not expose a stable resource path for its version.
- */
-export function detectAdapter(shellVersion: string): ShellAdapter | null {
+/** Detects the matching adapter from the running GNOME Shell version. */
+export function detectAdapter(shellVersion: string = Config.PACKAGE_VERSION): ShellAdapter | null {
   const major = shellVersion.split(".")[0];
   if (major === "46") return new V46Adapter();
   return null;
