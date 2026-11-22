@@ -204,6 +204,28 @@ describe("Engine", () => {
     expect(settings.maxCount).toBe(7);
   });
 
+  it("adopts notifications that were never signalled", () => {
+    const handle = new FakeHandle(1, "screenshot", 0);
+    const notification = {};
+    const bridge: Bridge = {
+      ...makeBridge(new Map([[1, handle]]), new Map()),
+      getExistingScreenshotNotifications: () => [notification],
+      makeHandle: () => handle,
+    };
+    const engine = new Engine(
+      makeSettingsStore(makeSettings()),
+      bridge,
+      "v46",
+      2,
+      new FakeScheduler(),
+    );
+
+    engine.sweep();
+
+    expect(engine.getStats().activeCount).toBe(1);
+    expect(handle.destroyed).toBe(false);
+  });
+
   it("does not panic when settings cannot be read", () => {
     const brokenStore = {
       read: () => {

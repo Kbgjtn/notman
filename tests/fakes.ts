@@ -98,6 +98,7 @@ export function makeBridge(
     capabilities: { tray: true, panel: true, dbus: true },
     start: () => true,
     sourceKeyFor: () => "screenshot",
+    getExistingScreenshotNotifications: () => [],
     makeHandle: (notification) => {
       const id = byNotification.get(notification) ?? handles.size + 1;
       const handle = handles.get(id);

@@ -16,6 +16,7 @@ export class Engine {
   private readonly _stats: Stats;
   private _sweepId: number | null = null;
   private _started = false;
+  private _sweeping = false;
 
   constructor(
     private readonly _settings: SettingsStore,
@@ -53,7 +54,7 @@ export class Engine {
     this._started = false;
   }
 
-  onNotificationAdded(notification: unknown): void {
+  onNotificationAdded(notification: unknown, deferSweep = false): void {
     const sourceKey = this._bridge.sourceKeyFor(notification);
     log.debug("engine", `notification added sourceKey=${sourceKey}`);
     const handle = this._bridge.makeHandle(notification, sourceKey);
@@ -61,7 +62,7 @@ export class Engine {
     this._handles.set(handle.id, handle);
     // Immediate pass: notifyEnabled=false and text-only apply without waiting
     // for the next sweep, so the full-size texture is never retained.
-    this.sweep();
+    if (!deferSweep) this.sweep();
   }
 
   onNotificationDestroyed(notification: unknown): void {
@@ -72,8 +73,20 @@ export class Engine {
     this._stats.update([...this._handles.values()]);
   }
 
+  /** Pull-based fallback in case a source-added signal was missed. */
+  private adoptExisting(): void {
+    for (const notification of this._bridge.getExistingScreenshotNotifications()) {
+      if (this._bridge.idFor(notification) !== null) continue;
+      log.debug("engine", "adopting pre-existing notification");
+      this.onNotificationAdded(notification, true);
+    }
+  }
+
   sweep(): void {
+    if (this._sweeping) return;
+    this._sweeping = true;
     try {
+      this.adoptExisting();
       const context: RuleContext = {
         nowMs: Date.now(),
         settings: this._settings.read(),
@@ -100,6 +113,8 @@ export class Engine {
       this._stats.update([...this._handles.values()]);
     } catch (e) {
       log.err("engine", "sweep failed", e);
+    } finally {
+      this._sweeping = false;
     }
   }
 

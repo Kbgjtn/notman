@@ -30,6 +30,7 @@ export interface Bridge {
     onDestroyed: (notification: unknown) => void,
   ): boolean;
   sourceKeyFor(notification: unknown): string;
+  getExistingScreenshotNotifications(): unknown[];
   makeHandle(notification: unknown, sourceKey: string): NotificationHandle | null;
   idFor(notification: unknown): number | null;
   currentlyShownId(): number | null;
@@ -211,6 +212,16 @@ export function createBridge(
       if (!notification || typeof notification !== "object") return "other";
       const source = (notification as { source?: unknown }).source;
       return adapter.isScreenshotSource(source) ? "screenshot" : "other";
+    },
+
+    getExistingScreenshotNotifications() {
+      const found: unknown[] = [];
+      for (const source of tray.getSources()) {
+        if (!adapter.isScreenshotSource(source)) continue;
+        const notifications = (source as { notifications?: unknown[] }).notifications;
+        if (Array.isArray(notifications)) found.push(...notifications);
+      }
+      return found;
     },
 
     makeHandle,
