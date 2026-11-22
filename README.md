@@ -99,11 +99,12 @@ gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
 
 ## Compatibility
 
-| GNOME      | Adapter | Notes                                                          |
-| ---------- | ------- | -------------------------------------------------------------- |
-| 46         | `v46`   | Target; upstream notification path verified against source     |
-| 45, 47, 48 | none    | Upstream screenshot notification code is effectively identical |
-| < 45       | none    | Legacy `imports.ui.*` API, different extension lifecycle       |
+| GNOME | Adapter | Notes                                                                              |
+| ----- | ------- | ---------------------------------------------------------------------------------- |
+| 46    | `v46`   | Primary dev/QA target; upstream notification path verified against source          |
+| 47    | `v47`   | Supported via shared GNOME 46+ base adapter                                        |
+| 48    | `v48`   | Supported; adapts GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` signature |
+| < 46  | none    | Older `MessageTray` / legacy `imports.ui.*` APIs                                   |
 
 A version is added to `metadata.json` only when an adapter for it exists.
 Major-only entries (e.g. `"46"`) cover patch releases.

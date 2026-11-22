@@ -261,8 +261,9 @@ export class ShellBridge implements Bridge {
                     const pixelFormat = hasAlpha
                       ? Cogl.PixelFormat.RGBA_8888
                       : Cogl.PixelFormat.RGB_888;
-                    const ok = content.set_bytes(
-                      pixelBytes as never,
+                    const ok = this._adapter.setImageContentBytes(
+                      content,
+                      pixelBytes,
                       pixelFormat,
                       width,
                       height,
