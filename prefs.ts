@@ -219,6 +219,21 @@ export default class NotmanPreferences extends ExtensionPreferences {
       return row;
     };
 
+    const makeActionButton = (label: string, variant?: "suggested" | "destructive"): Gtk.Button => {
+      const cssClasses =
+        variant === "suggested"
+          ? ["suggested-action"]
+          : variant === "destructive"
+            ? ["destructive-action"]
+            : [];
+      return new Gtk.Button({
+        label,
+        valign: Gtk.Align.CENTER,
+        width_request: 96,
+        css_classes: cssClasses,
+      });
+    };
+
     const addLinkRow = (group: Adw.PreferencesGroup, title: string, uri: string): void => {
       const row = new Adw.ActionRow({ title, activatable: true });
       row.add_suffix(new Gtk.Image({ icon_name: "go-next-symbolic" }));
@@ -747,11 +762,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         model: appNames,
         enable_search: true,
       });
-      const pickAddBtn = new Gtk.Button({
-        label: _("Add"),
-        valign: Gtk.Align.CENTER,
-        css_classes: ["suggested-action"],
-      });
+      const pickAddBtn = makeActionButton(_("Add"), "suggested");
       pickAddBtn.connect("clicked", () => {
         const chosen = installedApps[pickAppRow.selected];
         if (chosen) addRule(chosen.id);
@@ -763,10 +774,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const addRuleRow = new Adw.EntryRow({
       title: _("Or enter app name / ID"),
     });
-    const addRuleBtn = new Gtk.Button({
-      label: _("Add"),
-      valign: Gtk.Align.CENTER,
-    });
+    const addRuleBtn = makeActionButton(_("Add"), "suggested");
     addRuleRow.add_suffix(addRuleBtn);
     appRulesGroup.add(addRuleRow);
 
@@ -838,11 +846,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         });
         expander.add_row(expRow);
 
-        const removeBtn = new Gtk.Button({
-          label: _("Remove"),
-          valign: Gtk.Align.CENTER,
-          css_classes: ["destructive-action"],
-        });
+        const removeBtn = makeActionButton(_("Remove"), "destructive");
         removeBtn.connect("clicked", () => {
           const next = parseAppRules(settings.get_string(SettingKey.AppRules));
           next.splice(idx, 1);
@@ -899,10 +903,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
       }
     };
 
-    const exportBtn = new Gtk.Button({
-      label: _("Export"),
-      valign: Gtk.Align.CENTER,
-    });
+    const exportBtn = makeActionButton(_("Export"));
     exportBtn.connect("clicked", () => {
       const dialog = new Gtk.FileDialog({
         title: _("Export Notman settings"),
@@ -940,10 +941,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     exportRow.add_suffix(exportBtn);
     advancedGroup.add(exportRow);
 
-    const importBtn = new Gtk.Button({
-      label: _("Import"),
-      valign: Gtk.Align.CENTER,
-    });
+    const importBtn = makeActionButton(_("Import"));
     importBtn.connect("clicked", () => {
       const filter = new Gtk.FileFilter();
       filter.set_name(_("JSON files"));
@@ -986,11 +984,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     importRow.add_suffix(importBtn);
     advancedGroup.add(importRow);
 
-    const resetButton = new Gtk.Button({
-      label: _("Reset"),
-      valign: Gtk.Align.CENTER,
-      css_classes: ["destructive-action"],
-    });
+    const resetButton = makeActionButton(_("Reset"), "destructive");
     resetButton.connect("clicked", () => {
       const confirm = new Adw.MessageDialog({
         transient_for: window,
