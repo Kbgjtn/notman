@@ -116,7 +116,7 @@ Major-only entries (e.g. `"46"`) cover patch releases.
 sampling both RSS and the extension's D-Bus statistics. Screenshot saving is
 disabled for the duration of a run, so your Pictures directory is not touched;
 the shell still creates the notification and its full-size thumbnail. All
-settings and the display mode are restored on exit. Cases are `leak` (reference, guard off),
+settings, display mode and refresh rate are restored on exit. Cases are `leak` (reference, guard off),
 `leak-dndoff` (control), `drop`, `text`, `limit`, `expire`, `budget` and `cap`.
 The DND-off case is a control only: banners add compositor noise and the
 three-entry banner queue still leaks the overflow, so it is not the comparison

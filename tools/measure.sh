@@ -19,8 +19,8 @@ OUT="${OUT:-results/baseline.csv}"
 LOCKDOWN_SCHEMA="org.gnome.desktop.lockdown"
 
 # Re-exec once under the pin + timeout so every child inherits both.
-if [ -z "${_NT_PINNED:-}" ]; then
-  export _NT_PINNED=1
+if [ -z "${_NOTMAN_PINNED:-}" ]; then
+  export _NOTMAN_PINNED=1
   exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" bash "$0" "$@"
 fi
 

@@ -37,16 +37,16 @@ if [ "$CONFIRMED" -ne 1 ]; then
   exit 2
 fi
 
-if [ -z "${NT_BENCH_PINNED:-}" ]; then
-  export NT_BENCH_PINNED=1
-  export NT_PIN_CPU="$PIN_CPU"
-  export NT_TIMEOUT="$TIMEOUT_S"
+if [ -z "${NOTMAN_BENCH_PINNED:-}" ]; then
+  export NOTMAN_BENCH_PINNED=1
+  export NOTMAN_PIN_CPU="$PIN_CPU"
+  export NOTMAN_TIMEOUT="$TIMEOUT_S"
   exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" bash "$0" "${ARGS[@]}"
 fi
 
-NT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NOTMAN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
-source "$NT_DIR/common.sh"
+source "$NOTMAN_DIR/common.sh"
 
 mkdir -p results
 
@@ -73,8 +73,8 @@ for ((run = 1; run <= RUNS; run++)); do
     echo "# dnd_show_banners=$(gsettings get org.gnome.desktop.notifications show-banners)"
     echo "# save_to_disk=false"
     printf '# settings='
-    for key in "${NT_SETTINGS_KEYS[@]}"; do
-      printf '%s=%s ' "$key" "$(gsettings get "$NT_SETTINGS_SCHEMA" "$key")"
+    for key in "${NOTMAN_SETTINGS_KEYS[@]}"; do
+      printf '%s=%s ' "$key" "$(gsettings get "$NOTMAN_SETTINGS_SCHEMA" "$key")"
     done
     echo
     echo "shot,rss_kb,delta_kb,active_count,estimated_bytes,pruned_count,shell_rss_bytes"
