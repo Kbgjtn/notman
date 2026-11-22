@@ -429,4 +429,41 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(1);
     expect(engine.getStats().prunedCount).toBe(0);
   });
+
+  it("expires non-screenshot transient notifications under DND via TransientRule", () => {
+    const now = Date.now();
+    let dnd = false;
+    const transient = new FakeHandle(1, SourceKey.Other, now - 60_000, 0, false, false, true);
+    const notification = {};
+    const bridge: Bridge = {
+      ...makeBridge(new Map([[1, transient]]), new Map([[notification, 1]])),
+      sourceKeyFor: () => SourceKey.Other,
+      isDoNotDisturb: () => dnd,
+    };
+    const scheduler = new FakeScheduler();
+    const engine = new Engine(
+      makeSettingsStore(
+        makeSettings({
+          transientExpireEnabled: true,
+          transientExpireSeconds: 30,
+          transientDndOnly: true,
+        }),
+      ),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      scheduler,
+    );
+
+    engine.start();
+    engine.onNotificationAdded(notification);
+    scheduler.tick();
+    expect(transient.destroyed).toBe(false);
+
+    dnd = true;
+    scheduler.tick();
+    expect(transient.destroyed).toBe(true);
+    expect(engine.getStats().activeCount).toBe(0);
+    expect(engine.getStats().prunedCount).toBe(1);
+  });
 });

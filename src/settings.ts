@@ -11,6 +11,9 @@ export enum SettingKey {
   ScreenshotExpireSeconds = "screenshot-expire-seconds",
   ScreenshotMemoryBudgetMb = "screenshot-memory-budget-mb",
   EmergencyHardCap = "emergency-hard-cap",
+  TransientExpireEnabled = "transient-expire-enabled",
+  TransientExpireSeconds = "transient-expire-seconds",
+  TransientDndOnly = "transient-dnd-only",
   ShowIndicator = "show-indicator",
   ClearOnPanelOpen = "clear-on-panel-open",
   DebugLogging = "debug-logging",
@@ -24,6 +27,9 @@ const DEFAULTS: RuleSettings = {
   expireSeconds: 15,
   memoryBudgetMb: 64,
   emergencyHardCap: 64,
+  transientExpireEnabled: false,
+  transientExpireSeconds: 30,
+  transientDndOnly: true,
 };
 
 const RULE_KEYS = new Set<string>([
@@ -34,6 +40,9 @@ const RULE_KEYS = new Set<string>([
   SettingKey.ScreenshotExpireSeconds,
   SettingKey.ScreenshotMemoryBudgetMb,
   SettingKey.EmergencyHardCap,
+  SettingKey.TransientExpireEnabled,
+  SettingKey.TransientExpireSeconds,
+  SettingKey.TransientDndOnly,
 ]);
 
 export function parseThumbnailMode(raw: string): ThumbnailMode {
@@ -116,6 +125,15 @@ export class SettingsStore {
       expireSeconds: this.getInt(SettingKey.ScreenshotExpireSeconds, DEFAULTS.expireSeconds),
       memoryBudgetMb: this.getInt(SettingKey.ScreenshotMemoryBudgetMb, DEFAULTS.memoryBudgetMb),
       emergencyHardCap: this.getInt(SettingKey.EmergencyHardCap, DEFAULTS.emergencyHardCap),
+      transientExpireEnabled: this.getBoolean(
+        SettingKey.TransientExpireEnabled,
+        DEFAULTS.transientExpireEnabled,
+      ),
+      transientExpireSeconds: this.getInt(
+        SettingKey.TransientExpireSeconds,
+        DEFAULTS.transientExpireSeconds,
+      ),
+      transientDndOnly: this.getBoolean(SettingKey.TransientDndOnly, DEFAULTS.transientDndOnly),
     };
     if (this._changedId !== null) this._cache = snapshot;
     return snapshot;

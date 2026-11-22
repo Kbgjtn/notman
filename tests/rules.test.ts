@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MiB } from "../src/byte-estimate.js";
 import { CapRule } from "../src/rules/cap.js";
 import { ScreenshotRule } from "../src/rules/screenshot.js";
+import { TransientRule } from "../src/rules/transient.js";
 import { SourceKey, ThumbnailMode } from "../src/types.js";
 import { FakeHandle, makeContext, makeSettings } from "./fakes.js";
 
@@ -295,5 +296,109 @@ describe("CapRule", () => {
       makeContext(makeSettings({ emergencyHardCap: 1 }), 1_000_000, 3),
     );
     expect(outcome.destroy).toEqual([]);
+  });
+
+  it("never destroys persistent non-screenshot notifications", () => {
+    const persistent1 = new FakeHandle(1, SourceKey.Other, 1, 0, false, false, false);
+    const persistent2 = new FakeHandle(2, SourceKey.Other, 2, 0, false, false, false);
+    const transient = new FakeHandle(3, SourceKey.Other, 3, 0, false, false, true);
+    const outcome = rule.evaluate(
+      [persistent1, persistent2, transient],
+      makeContext(makeSettings({ emergencyHardCap: 1 })),
+    );
+    expect(outcome.destroy).toEqual([]);
+  });
+});
+
+describe("TransientRule", () => {
+  const rule = new TransientRule();
+
+  it("does nothing when disabled or guard is off", () => {
+    const old = new FakeHandle(1, SourceKey.Other, 0, 0, false, false, true);
+    expect(
+      rule.evaluate([old], makeContext(makeSettings({ transientExpireEnabled: false }), 100_000))
+        .destroy,
+    ).toEqual([]);
+    expect(
+      rule.evaluate(
+        [old],
+        makeContext(makeSettings({ guardEnabled: false, transientExpireEnabled: true }), 100_000),
+      ).destroy,
+    ).toEqual([]);
+  });
+
+  it("respects transientDndOnly when DND is off", () => {
+    const old = new FakeHandle(1, SourceKey.Other, 0, 0, false, false, true);
+    const dndOff = rule.evaluate(
+      [old],
+      makeContext(
+        makeSettings({
+          transientExpireEnabled: true,
+          transientExpireSeconds: 30,
+          transientDndOnly: true,
+        }),
+        60_000,
+        null,
+        false,
+      ),
+    );
+    expect(dndOff.destroy).toEqual([]);
+
+    const dndNotRequired = rule.evaluate(
+      [old],
+      makeContext(
+        makeSettings({
+          transientExpireEnabled: true,
+          transientExpireSeconds: 30,
+          transientDndOnly: false,
+        }),
+        60_000,
+        null,
+        false,
+      ),
+    );
+    expect(dndNotRequired.destroy).toEqual([old]);
+  });
+
+  it("expires only non-screenshot transient handles past the cutoff under DND", () => {
+    const expired = new FakeHandle(1, SourceKey.Other, 10_000, 0, false, false, true);
+    const fresh = new FakeHandle(2, SourceKey.Other, 50_000, 0, false, false, true);
+    const persistent = new FakeHandle(3, SourceKey.Other, 10_000, 0, false, false, false);
+    const screenshot = new FakeHandle(4, SourceKey.Screenshot, 10_000, 0, false, false, true);
+    const outcome = rule.evaluate(
+      [expired, fresh, persistent, screenshot],
+      makeContext(
+        makeSettings({
+          transientExpireEnabled: true,
+          transientExpireSeconds: 30,
+          transientDndOnly: true,
+        }),
+        60_000,
+        null,
+        true,
+      ),
+    );
+    expect(outcome.destroy).toEqual([expired]);
+  });
+
+  it("never destroys critical, feedback, or currently shown transient handles", () => {
+    const critical = new FakeHandle(1, SourceKey.Other, 0, 0, true, false, true);
+    const feedback = new FakeHandle(2, SourceKey.Other, 0, 0, false, true, true);
+    const shown = new FakeHandle(3, SourceKey.Other, 0, 0, false, false, true);
+    const normal = new FakeHandle(4, SourceKey.Other, 0, 0, false, false, true);
+    const outcome = rule.evaluate(
+      [critical, feedback, shown, normal],
+      makeContext(
+        makeSettings({
+          transientExpireEnabled: true,
+          transientExpireSeconds: 10,
+          transientDndOnly: true,
+        }),
+        60_000,
+        3,
+        true,
+      ),
+    );
+    expect(outcome.destroy).toEqual([normal]);
   });
 });

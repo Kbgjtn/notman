@@ -35,6 +35,7 @@ export interface Bridge {
   makeHandle(notification: unknown, sourceKey: SourceKey): NotificationHandle | null;
   idFor(notification: unknown): number | null;
   currentlyShownId(): number | null;
+  isDoNotDisturb(): boolean;
   readRssBytes(): number;
   stop(): void;
 }
@@ -65,13 +66,24 @@ export class ShellBridge implements Bridge {
   private _stopped = false;
   private _onAdded: ((notification: unknown) => void) | null = null;
   private _onDestroyed: ((notification: unknown) => void) | null = null;
+  private readonly _desktopNotifications: Gio.Settings | null;
 
   private constructor(
     private readonly _tray: TrayLike,
     private readonly _adapter: ShellAdapter,
     readonly capabilities: AdapterCapabilities,
     private readonly _disposables: Disposables,
-  ) {}
+  ) {
+    let desktopNotifications: Gio.Settings | null = null;
+    try {
+      desktopNotifications = new Gio.Settings({
+        schema_id: "org.gnome.desktop.notifications",
+      });
+    } catch (e) {
+      log.debug("bridge", `could not open org.gnome.desktop.notifications: ${String(e)}`);
+    }
+    this._desktopNotifications = desktopNotifications;
+  }
 
   static create(
     adapter: ShellAdapter,
@@ -138,6 +150,7 @@ export class ShellBridge implements Bridge {
 
     const initialBytes = estimateContentBytes(target.gicon);
     const isCritical = target.urgency === this._adapter.criticalUrgency();
+    const isTransient = Boolean(target.isTransient);
     const downgraded = this._downgraded;
     const compactBytes = this._compactBytes;
     const downgrade = (): void => {
@@ -152,7 +165,7 @@ export class ShellBridge implements Bridge {
     };
     log.debug(
       "bridge",
-      `handle id=${id} sourceKey=${sourceKey} bytes=${initialBytes} critical=${isCritical}`,
+      `handle id=${id} sourceKey=${sourceKey} bytes=${initialBytes} critical=${isCritical} transient=${isTransient}`,
     );
 
     return {
@@ -165,6 +178,7 @@ export class ShellBridge implements Bridge {
       },
       isCritical,
       forFeedback: Boolean(target.forFeedback),
+      isTransient,
       isCompacted: (): boolean => this._compacted.has(target),
       compact: (): void => {
         if (
@@ -326,6 +340,15 @@ export class ShellBridge implements Bridge {
     return null;
   }
 
+  isDoNotDisturb(): boolean {
+    if (!this._desktopNotifications) return false;
+    try {
+      return !this._desktopNotifications.get_boolean("show-banners");
+    } catch {
+      return false;
+    }
+  }
+
   readRssBytes(): number {
     try {
       const [ok, contents] = Gio.File.new_for_path("/proc/self/status").load_contents(null);
@@ -408,14 +431,13 @@ export class ShellBridge implements Bridge {
 
   private observeSource(source: unknown): void {
     if (!source || typeof source !== "object") return;
-    const matches = this._adapter.isScreenshotSource(source);
     if (!this._seenSources.has(source)) {
       this._seenSources.add(source);
+      const matches = this._adapter.isScreenshotSource(source);
       log.debug(
         "bridge",
         `source title=${String((source as { title?: unknown }).title)} iconName=${String((source as { iconName?: unknown }).iconName)} screenshot=${matches}`,
       );
-      if (!matches) return;
 
       const emitter = source as SignalEmitter;
       if (typeof emitter.connect === "function") {
@@ -449,8 +471,6 @@ export class ShellBridge implements Bridge {
         destroyId = emitter.connect(this._adapter.signals.destroy, disposeSource);
         this._disposables.add(disposeSource);
       }
-    } else if (!matches) {
-      return;
     }
 
     const existing = (source as { notifications?: unknown[] }).notifications;

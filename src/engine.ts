@@ -1,6 +1,7 @@
 import { log } from "./log.js";
 import { CapRule } from "./rules/cap.js";
 import { ScreenshotRule } from "./rules/screenshot.js";
+import { TransientRule } from "./rules/transient.js";
 import type { Scheduler } from "./scheduler.js";
 import type { SettingsStore } from "./settings.js";
 import type { Bridge } from "./shell-bridge.js";
@@ -16,7 +17,7 @@ import {
 const SWEEP_INTERVAL_MS = 1000;
 
 export class Engine {
-  private readonly _rules: Rule[] = [new ScreenshotRule(), new CapRule()];
+  private readonly _rules: Rule[] = [new ScreenshotRule(), new TransientRule(), new CapRule()];
   private readonly _handles = new Map<number, NotificationHandle>();
   private readonly _pending = new Set<number>();
   private readonly _stats: Stats;
@@ -94,6 +95,7 @@ export class Engine {
         nowMs: Date.now(),
         settings: this._settings.read(),
         currentlyShownId: this._bridge.currentlyShownId(),
+        isDoNotDisturb: this._bridge.isDoNotDisturb(),
       };
       for (const rule of this._rules) {
         // Rules may destroy handles, so each one sees the surviving set.

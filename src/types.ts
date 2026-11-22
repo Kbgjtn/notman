@@ -27,6 +27,9 @@ export interface RuleSettings {
   readonly expireSeconds: number;
   readonly memoryBudgetMb: number;
   readonly emergencyHardCap: number;
+  readonly transientExpireEnabled: boolean;
+  readonly transientExpireSeconds: number;
+  readonly transientDndOnly: boolean;
 }
 
 export interface NotificationHandle {
@@ -36,6 +39,7 @@ export interface NotificationHandle {
   readonly estimatedBytes: number;
   readonly isCritical: boolean;
   readonly forFeedback: boolean;
+  readonly isTransient: boolean;
   isCompacted(): boolean;
   compact(): void;
   isDowngraded(): boolean;
@@ -47,6 +51,7 @@ export interface RuleContext {
   readonly nowMs: number;
   readonly settings: RuleSettings;
   readonly currentlyShownId: number | null;
+  readonly isDoNotDisturb: boolean;
 }
 
 export interface RuleOutcome {

@@ -17,6 +17,9 @@ export interface MutableRuleSettings {
   expireSeconds: number;
   memoryBudgetMb: number;
   emergencyHardCap: number;
+  transientExpireEnabled: boolean;
+  transientExpireSeconds: number;
+  transientDndOnly: boolean;
 }
 
 export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRuleSettings {
@@ -28,6 +31,9 @@ export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRule
     expireSeconds: 0,
     memoryBudgetMb: 0,
     emergencyHardCap: 0,
+    transientExpireEnabled: false,
+    transientExpireSeconds: 30,
+    transientDndOnly: true,
     ...overrides,
   };
 }
@@ -36,8 +42,9 @@ export function makeContext(
   settings: RuleSettings,
   nowMs = 1_000_000,
   currentlyShownId: number | null = null,
+  isDoNotDisturb = true,
 ): RuleContext {
-  return { nowMs, settings, currentlyShownId };
+  return { nowMs, settings, currentlyShownId, isDoNotDisturb };
 }
 
 export class FakeHandle implements NotificationHandle {
@@ -171,6 +178,7 @@ export function makeBridge(
     },
     idFor: (notification) => byNotification.get(notification) ?? null,
     currentlyShownId: () => null,
+    isDoNotDisturb: () => true,
     readRssBytes: () => 0,
     stop: () => {},
   };

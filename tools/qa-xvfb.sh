@@ -137,6 +137,40 @@ if [ "${COMPACT_BYTES:-0}" -le 0 ] || [ "${COMPACT_BYTES:-0}" -ge 100000 ]; then
 fi
 echo "QA OK: compact thumbnail tracked (activeCount=$COMPACT_COUNT, estimatedBytes=$COMPACT_BYTES)"
 
+echo "--- transient DND expiry ---"
+gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
+  --object-path /org/gnome/Shell/Extensions/Notman \
+  --method org.gnome.Shell.Extensions.Notman.ClearScreenshots >/dev/null
+gsettings set org.gnome.shell.extensions.notman transient-expire-enabled true
+gsettings set org.gnome.shell.extensions.notman transient-expire-seconds 5
+gsettings set org.gnome.shell.extensions.notman transient-dnd-only true
+sleep 1
+
+notify-send --hint=byte:transient:1 "Notman QA" "Transient DND test"
+sleep 1
+BEFORE_EXPIRE="$(gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
+  --object-path /org/gnome/Shell/Extensions/Notman \
+  --method org.gnome.Shell.Extensions.Notman.GetStats)"
+echo "before expiry: $BEFORE_EXPIRE"
+BEFORE_COUNT="$(echo "$BEFORE_EXPIRE" | grep -o "activeCount': <[0-9]*>" | grep -o '[0-9]*' || true)"
+if [ "${BEFORE_COUNT:-0}" -le 0 ]; then
+  echo "QA FAIL: transient notification was not tracked (activeCount=${BEFORE_COUNT:-none})" >&2
+  exit 1
+fi
+
+sleep 6
+AFTER_EXPIRE="$(gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
+  --object-path /org/gnome/Shell/Extensions/Notman \
+  --method org.gnome.Shell.Extensions.Notman.GetStats)"
+echo "after expiry: $AFTER_EXPIRE"
+AFTER_COUNT="$(echo "$AFTER_EXPIRE" | grep -o "activeCount': <[0-9]*>" | grep -o '[0-9]*' || true)"
+if [ "${AFTER_COUNT:-1}" -ne 0 ]; then
+  echo "QA FAIL: transient notification did not expire (activeCount=${AFTER_COUNT:-none})" >&2
+  grep -iE 'notman|transient|bridge' "$QA_TMP/shell.log" | tail -30 || true
+  exit 1
+fi
+echo "QA OK: transient notification tracked and expired under DND"
+
 ERRORS="$(gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
   --method org.gnome.Shell.Extensions.GetExtensionErrors notman@ozy.local)"
 echo "--- extension errors (final) ---"

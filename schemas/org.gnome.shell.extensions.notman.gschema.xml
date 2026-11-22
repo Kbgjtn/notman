@@ -77,6 +77,34 @@
       </description>
     </key>
 
+    <key name="transient-expire-enabled" type="b">
+      <default>false</default>
+      <summary>Expire transient notifications from other apps</summary>
+      <description>
+        When true, non-screenshot transient notifications are destroyed after
+        transient-expire-seconds. Closes the GNOME Do-Not-Disturb transient
+        notification leak across all applications.
+      </description>
+    </key>
+
+    <key name="transient-expire-seconds" type="i">
+      <default>30</default>
+      <range min="5" max="300"/>
+      <summary>Transient notification expiry</summary>
+      <description>
+        Seconds before a non-screenshot transient notification is destroyed.
+      </description>
+    </key>
+
+    <key name="transient-dnd-only" type="b">
+      <default>true</default>
+      <summary>Expire transient notifications only in Do Not Disturb</summary>
+      <description>
+        When true, transient notification expiry only applies while Do Not
+        Disturb is enabled (show-banners is false).
+      </description>
+    </key>
+
     <key name="show-indicator" type="b">
       <default>true</default>
       <summary>Show top-bar indicator</summary>

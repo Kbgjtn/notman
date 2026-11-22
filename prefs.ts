@@ -116,7 +116,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const statusGroup = new Adw.PreferencesGroup({
       title: _("Status"),
     });
-    const activeRow = new Adw.ActionRow({ title: _("Active screenshots") });
+    const activeRow = new Adw.ActionRow({ title: _("Tracked notifications") });
     const prunedRow = new Adw.ActionRow({ title: _("Pruned this session") });
     statusGroup.add(activeRow);
     statusGroup.add(prunedRow);
@@ -252,6 +252,39 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }
     page.add(rulesGroup);
 
+    const transientGroup = new Adw.PreferencesGroup({
+      title: _("Transient notifications"),
+      description: _(
+        "Clean up transient notifications from other apps that linger in Do Not Disturb.",
+      ),
+    });
+    bind(SettingKey.GuardEnabled, transientGroup, "sensitive", Gio.SettingsBindFlags.GET);
+
+    addSwitch(
+      transientGroup,
+      SettingKey.TransientExpireEnabled,
+      _("Expire transient notifications"),
+      _("Automatically remove transient notifications from other apps after a delay."),
+    );
+    const transientDndRow = addSwitch(
+      transientGroup,
+      SettingKey.TransientDndOnly,
+      _("Only in Do Not Disturb"),
+      _("Apply expiry only while notification banners are suppressed."),
+    );
+    const transientExpireRow = addSpin(
+      transientGroup,
+      SettingKey.TransientExpireSeconds,
+      _("Expire after (seconds)"),
+      _("Remove transient notifications after this many seconds."),
+      5,
+      300,
+      5,
+    );
+    for (const dependentRow of [transientDndRow, transientExpireRow]) {
+      bind(SettingKey.TransientExpireEnabled, dependentRow, "sensitive", Gio.SettingsBindFlags.GET);
+    }
+    page.add(transientGroup);
     const advancedGroup = new Adw.PreferencesGroup({
       title: _("Advanced"),
     });
