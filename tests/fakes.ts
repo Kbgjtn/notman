@@ -29,17 +29,24 @@ export class FakeHandle implements NotificationHandle {
   downgraded = false;
   destroyCalls = 0;
   downgradeCalls = 0;
+  private readonly _bytes: number;
+
+  get estimatedBytes(): number {
+    return this.downgraded ? 0 : this._bytes;
+  }
 
   constructor(
     readonly id: number,
     readonly sourceKey: string,
     readonly receivedAtMs: number,
-    readonly estimatedBytes = 0,
+    estimatedBytes = 0,
     readonly isCritical = false,
     readonly forFeedback = false,
     readonly isTransient = true,
     readonly destroyThrows = false,
-  ) {}
+  ) {
+    this._bytes = estimatedBytes;
+  }
 
   isDowngraded(): boolean {
     return this.downgraded;

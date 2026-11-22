@@ -87,7 +87,9 @@ export function createBridge(
       id,
       sourceKey,
       receivedAtMs: Date.now(),
-      estimatedBytes,
+      get estimatedBytes() {
+        return downgraded.has(target) ? 0 : estimatedBytes;
+      },
       isCritical: target.urgency === adapter.criticalUrgency(),
       forFeedback: !!target.forFeedback,
       isTransient: !!target.isTransient,

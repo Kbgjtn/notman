@@ -204,6 +204,24 @@ describe("Engine", () => {
     expect(settings.maxCount).toBe(7);
   });
 
+  it("reports zero estimated bytes after a text-only downgrade", () => {
+    const handle = new FakeHandle(1, "screenshot", 0, 1024);
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ thumbnailMode: "text-only" })),
+      bridge,
+      "v46",
+      2,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(notification);
+
+    expect(handle.downgraded).toBe(true);
+    expect(engine.getStats().estimatedBytes).toBe(0);
+  });
+
   it("adopts notifications that were never signalled", () => {
     const handle = new FakeHandle(1, "screenshot", 0);
     const notification = {};
