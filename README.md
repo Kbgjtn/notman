@@ -2,7 +2,7 @@
 
 **Notification manager for GNOME Shell 46, 47, and 48.**
 
-Notman fixes GNOME Shell's screenshot & Do-Not-Disturb notification memory leaks and exposes the notification policies GNOME keeps hidden — with compact downscaled previews (~36 KB vs ~32 MiB at 4K), per-app rules, burst protection, scheduled Quiet hours, and native libadwaita Preferences.
+Notman fixes GNOME Shell's screenshot & Do-Not-Disturb notification memory leaks and exposes the notification policies GNOME keeps hidden: compact downscaled previews (~36 KB vs ~32 MiB at 4K), per-app rules, burst protection, scheduled Quiet hours, and native libadwaita Preferences.
 
 ## Features
 
@@ -19,6 +19,26 @@ Notman fixes GNOME Shell's screenshot & Do-Not-Disturb notification memory leaks
 | Top-bar tray menu                  | Preferences                           |
 | ---------------------------------- | ------------------------------------- |
 | ![Notman tray menu](docs/tray.png) | ![Notman preferences](docs/prefs.png) |
+
+## Why Notman exists
+
+This is a measurable memory leak in GNOME Shell, not a problem with the screenshot tool or files on disk:
+
+1. `js/ui/screenshot.js` turns each capture into an `St.ImageContent` holding `pixbuf.read_pixel_bytes()` at full width × height in RGBA8888 (~31.6 MiB for a 3840×2160 screenshot).
+2. Every screenshot creates a **new `MessageTray.Source`** with `isTransient: true`, bypassing `MAX_NOTIFICATIONS_PER_SOURCE`.
+3. Transient notifications are only destroyed in `MessageTray._hideNotificationCompleted()`, which only runs after a banner is shown and hidden.
+4. With Do Not Disturb enabled, `_onNotificationRequestBanner()` returns early for non-critical notifications. No banner is shown, so every full-size texture stays retained for the lifetime of the shell session.
+
+### Measured proof (GNOME Shell 46, X11, DND on, 10 × `Shift+Print`)
+
+| Measurement                                               | gnome-shell RSS                                  |
+| --------------------------------------------------------- | ------------------------------------------------ |
+| Before                                                    | 656,484 kB                                       |
+| After 10 screenshots (unmanaged)                          | 1,096,748 kB (**+440,264 kB**)                   |
+| Estimated thumbnails at `2560×1440` (`leak`, 9 shots)     | **126.6 MiB**                                    |
+| Estimated thumbnails at `2560×1440` (`compact`, 10 shots) | **0.4 MiB** (36.8 KB/shot, **99.75% reduction**) |
+
+Raw samples and full benchmark breakdown live in [results/report.md](results/report.md).
 
 ## Install
 
@@ -59,27 +79,7 @@ gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
 | 48    | `v48`   | Supported; adapts GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` signature |
 | < 46  | none    | Older `MessageTray` / legacy `imports.ui.*` APIs                                   |
 
-Node/npm is required **only at build time** — the installed extension is plain JS.
-
-## Why Notman exists
-
-This is a measurable memory leak in GNOME Shell, not a problem with the screenshot tool or files on disk:
-
-1. `js/ui/screenshot.js` turns each capture into an `St.ImageContent` holding `pixbuf.read_pixel_bytes()` at full width × height in RGBA8888 (~31.6 MiB for a 3840×2160 screenshot).
-2. Every screenshot creates a **new `MessageTray.Source`** with `isTransient: true`, bypassing `MAX_NOTIFICATIONS_PER_SOURCE`.
-3. Transient notifications are only destroyed in `MessageTray._hideNotificationCompleted()`, which only runs after a banner is shown and hidden.
-4. With Do Not Disturb enabled, `_onNotificationRequestBanner()` returns early for non-critical notifications — no banner is shown, so every full-size texture stays retained for the lifetime of the shell session.
-
-### Measured proof (GNOME Shell 46, X11, DND on, 10 × `Shift+Print`)
-
-| Measurement                                               | gnome-shell RSS                                  |
-| --------------------------------------------------------- | ------------------------------------------------ |
-| Before                                                    | 656,484 kB                                       |
-| After 10 screenshots (unmanaged)                          | 1,096,748 kB (**+440,264 kB**)                   |
-| Estimated thumbnails at `2560×1440` (`leak`, 9 shots)     | **126.6 MiB**                                    |
-| Estimated thumbnails at `2560×1440` (`compact`, 10 shots) | **0.4 MiB** (36.8 KB/shot, **99.75% reduction**) |
-
-Raw samples and full benchmark breakdown live in [results/report.md](results/report.md).
+Node/npm is needed **only at build time**. The installed extension is plain JS.
 
 ## Measurement & benchmarks
 
