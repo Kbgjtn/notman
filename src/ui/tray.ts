@@ -1,3 +1,4 @@
+import Clutter from "gi://Clutter";
 import type Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import St from "gi://St";
@@ -80,7 +81,7 @@ export class TrayIndicator {
     this._statusSeparator = new PopupMenu.PopupSeparatorMenuItem("");
     menu.addMenuItem(this._statusSeparator);
 
-    const prefsItem = new PopupMenu.PopupMenuItem(_("Settings…"));
+    const prefsItem = new PopupMenu.PopupMenuItem(_("Settings"));
     prefsItem.connect("activate", () => {
       try {
         openPreferences();
@@ -181,9 +182,11 @@ export class TrayIndicator {
       reactive: false,
       can_focus: false,
     });
+    row.setOrnament(PopupMenu.Ornament.HIDDEN);
     const box = new St.BoxLayout({
       x_expand: true,
-      style: "spacing: 6px;",
+      x_align: Clutter.ActorAlign.FILL,
+      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 6 }),
     });
     const choices: Array<{ mode: ThumbnailMode; label: string; button: St.Button }> = [
       { mode: ThumbnailMode.Full, label: _("Full"), button: this.makeModeButton(_("Full")) },
