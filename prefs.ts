@@ -33,7 +33,7 @@ function buildPrefsCss(isDark: boolean): string {
 }
 button.notman-mode-card {
   border-radius: 9px;
-  padding: 12px 10px;
+  padding: 10px 8px;
   border: 1px solid transparent;
   background-color: transparent;
 }
@@ -222,7 +222,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         value_pos: Gtk.PositionType.TOP,
         digits: 0,
         round_digits: 0,
-        width_request: 180,
+        width_request: 120,
         valign: Gtk.Align.CENTER,
       });
       const row = new Adw.ActionRow({ title, subtitle });
@@ -574,6 +574,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
         new Gtk.Label({
           label: opt.title,
           xalign: 0,
+          wrap: true,
+          width_chars: 1,
           css_classes: ["heading"],
         }),
       );
@@ -582,6 +584,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
           label: opt.subtitle,
           xalign: 0,
           wrap: true,
+          width_chars: 1,
+          max_width_chars: 16,
           css_classes: ["caption", "dim-label"],
         }),
       );
