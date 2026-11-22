@@ -29,9 +29,9 @@ describe("scaffold", () => {
     }
   });
 
-  it("uses the verified prefs import path, not the outdated sample", () => {
+  it("uses the compiled shell resource path for preferences", () => {
     const prefs = readFileSync("prefs.ts", "utf8");
-    expect(prefs).toContain("resource:///org/gnome/shell/extensions/prefs.js");
-    expect(prefs).not.toContain("resource:///org/gnome/Shell/Extensions/js/");
+    expect(prefs).toContain("resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js");
+    expect(prefs).not.toContain("resource:///org/gnome/shell/extensions/prefs.js");
   });
 });

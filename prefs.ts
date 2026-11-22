@@ -2,11 +2,11 @@ import Adw from "gi://Adw";
 import {
   gettext as _,
   ExtensionPreferences,
-} from "resource:///org/gnome/shell/extensions/prefs.js";
+} from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 /**
- * Import path is pinned to the verified GNOME 46 module; the gjs.guide sample
- * uses an outdated path.
+ * This is the resource path used by the GNOME 46 shell build; the shorter
+ * source-tree path does not exist in the compiled resources.
  */
 export default class NotmanPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {

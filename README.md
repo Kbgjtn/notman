@@ -75,9 +75,9 @@ notification is created, before the full-size image is retained.
 Pinned to versions with a clean audit and no deprecation warnings: TypeScript 7,
 Vitest 5, Biome 2 and `@girs/gnome-shell` 46.x. The `@girs` packages are
 intentionally held at GNOME 46 definitions even though newer majors exist, so
-the types match the shell version in `metadata.json`. Both the 46 and 51
-releases of `@girs/gnome-shell` still declare the pre-45 prefs resource path;
-`src/types/resource-paths.d.ts` corrects it locally.
+the types match the shell version in `metadata.json`. The preferences module is
+imported from `resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js`,
+the path that exists in the compiled shell resources.
 
 ## Build and install
 

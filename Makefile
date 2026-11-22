@@ -35,9 +35,9 @@ check-schema: schemas/gschemas.compiled
 
 check-imports: build
 	@echo "Checking pinned resource:// import paths..."
-	@! grep -R "resource:///org/gnome/Shell/Extensions/js/" dist --include='*.js'
+	@! grep -R "resource:///org/gnome/shell/extensions/prefs.js" dist --include='*.js'
 	@grep -q "resource:///org/gnome/shell/extensions/extension.js" dist/extension.js
-	@grep -q "resource:///org/gnome/shell/extensions/prefs.js" dist/prefs.js
+	@grep -q "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js" dist/prefs.js
 	@echo "Import paths OK"
 
 test: $(STAMP)
