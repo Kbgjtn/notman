@@ -717,21 +717,60 @@ export default class NotmanPreferences extends ExtensionPreferences {
     });
     bind(SettingKey.GuardEnabled, appRulesGroup, "sensitive", Gio.SettingsBindFlags.GET);
 
+    const installedApps = Gio.AppInfo.get_all()
+      .filter((app) => app.should_show() && Boolean(app.get_id()))
+      .map((app) => ({
+        name: app.get_display_name() || app.get_name() || app.get_id() || "",
+        id: app.get_id() || "",
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const writeAppRules = (rules: AppRuleEntry[]): void => {
+      settings.set_string(SettingKey.AppRules, JSON.stringify(rules));
+    };
+
+    const addRule = (rawMatch: string): void => {
+      const match = rawMatch.trim();
+      if (!match) return;
+      const rules = parseAppRules(settings.get_string(SettingKey.AppRules));
+      if (!rules.some((r) => r.match.toLowerCase() === match.toLowerCase())) {
+        rules.push({ match, muted: false, maxCount: 2, expireSeconds: 0 });
+        writeAppRules(rules);
+      }
+    };
+
+    if (installedApps.length > 0) {
+      const appNames = new Gtk.StringList({});
+      for (const app of installedApps) appNames.append(app.name);
+      const pickAppRow = new Adw.ComboRow({
+        title: _("Pick an app"),
+        model: appNames,
+        enable_search: true,
+      });
+      const pickAddBtn = new Gtk.Button({
+        label: _("Add"),
+        valign: Gtk.Align.CENTER,
+        css_classes: ["suggested-action"],
+      });
+      pickAddBtn.connect("clicked", () => {
+        const chosen = installedApps[pickAppRow.selected];
+        if (chosen) addRule(chosen.id);
+      });
+      pickAppRow.add_suffix(pickAddBtn);
+      appRulesGroup.add(pickAppRow);
+    }
+
     const addRuleRow = new Adw.EntryRow({
-      title: _("App name or ID (e.g. slack, firefox, discord)"),
+      title: _("Or enter app name / ID"),
     });
     const addRuleBtn = new Gtk.Button({
       label: _("Add"),
       valign: Gtk.Align.CENTER,
-      css_classes: ["suggested-action"],
     });
     addRuleRow.add_suffix(addRuleBtn);
     appRulesGroup.add(addRuleRow);
 
     const renderedRuleRows: Adw.ExpanderRow[] = [];
-    const writeAppRules = (rules: AppRuleEntry[]): void => {
-      settings.set_string(SettingKey.AppRules, JSON.stringify(rules));
-    };
 
     const rebuildAppRuleRows = (): void => {
       while (renderedRuleRows.length > 0) {
@@ -819,13 +858,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     };
 
     const addRuleFromEntry = (): void => {
-      const match = addRuleRow.text.trim();
-      if (!match) return;
-      const rules = parseAppRules(settings.get_string(SettingKey.AppRules));
-      if (!rules.some((r) => r.match.toLowerCase() === match.toLowerCase())) {
-        rules.push({ match, muted: false, maxCount: 2, expireSeconds: 0 });
-        writeAppRules(rules);
-      }
+      addRule(addRuleRow.text);
       addRuleRow.text = "";
     };
     addRuleBtn.connect("clicked", addRuleFromEntry);
@@ -959,13 +992,31 @@ export default class NotmanPreferences extends ExtensionPreferences {
       css_classes: ["destructive-action"],
     });
     resetButton.connect("clicked", () => {
-      for (const key of Object.values(SettingKey)) {
-        try {
-          settings.reset(key);
-        } catch {
-          // Ignore individual key reset failures.
+      const confirm = new Adw.MessageDialog({
+        transient_for: window,
+        modal: true,
+        heading: _("Reset all settings?"),
+        body: _(
+          "This will restore default values and remove any custom per-app rules and quiet hours.",
+        ),
+      });
+      confirm.add_response("cancel", _("Cancel"));
+      confirm.add_response("reset", _("Reset"));
+      confirm.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE);
+      confirm.set_default_response("cancel");
+      confirm.set_close_response("cancel");
+      confirm.connect("response", (_dlg, response) => {
+        if (response !== "reset") return;
+        for (const key of Object.values(SettingKey)) {
+          try {
+            settings.reset(key);
+          } catch {
+            // Ignore individual key reset failures.
+          }
         }
-      }
+        showToast(_("Settings reset to defaults"));
+      });
+      confirm.present();
     });
     const resetRow = new Adw.ActionRow({
       title: _("Reset settings"),

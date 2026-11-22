@@ -81,6 +81,13 @@ export class TrayIndicator {
     );
     this._modeRow = this.addPreviewModeBar();
 
+    this.addSwitch(
+      _("Quiet hours"),
+      SettingKey.QuietHoursEnabled,
+      () => this._settings.get_boolean(SettingKey.QuietHoursEnabled),
+      (value) => this._settings.set_boolean(SettingKey.QuietHoursEnabled, value),
+    );
+
     const statsCard = this.addStatsCard();
     this._statsRow = statsCard.row;
     this._activeValue = statsCard.activeValue;
