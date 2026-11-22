@@ -8,7 +8,7 @@ text = sys.stdin.read()
 
 
 def get(key):
-    match = re.search(r"'%s': <(-?\d+)>" % key, text)
+    match = re.search(r"'%s': <(?:int64 )?(-?\d+)>" % key, text)
     return match.group(1) if match else ""
 
 

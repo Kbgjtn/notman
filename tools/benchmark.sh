@@ -12,6 +12,7 @@ EXPIRE_PAUSE=3
 PIN_CPU=2
 TIMEOUT_S=90
 CONFIRMED=0
+ARGS=("$@")
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -40,7 +41,7 @@ if [ -z "${NT_BENCH_PINNED:-}" ]; then
   export NT_BENCH_PINNED=1
   export NT_PIN_CPU="$PIN_CPU"
   export NT_TIMEOUT="$TIMEOUT_S"
-  exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" "$0" "$@"
+  exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" bash "$0" "${ARGS[@]}"
 fi
 
 NT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

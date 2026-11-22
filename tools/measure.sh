@@ -21,7 +21,7 @@ LOCKDOWN_SCHEMA="org.gnome.desktop.lockdown"
 # Re-exec once under the pin + timeout so every child inherits both.
 if [ -z "${_NT_PINNED:-}" ]; then
   export _NT_PINNED=1
-  exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" "$0" "$@"
+  exec timeout "$TIMEOUT_S" taskset -c "$PIN_CPU" bash "$0" "$@"
 fi
 
 PID="$(pgrep -u "$(id -u)" -x gnome-shell | head -1 || true)"
