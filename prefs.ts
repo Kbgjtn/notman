@@ -236,7 +236,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const addLinkRow = (group: Adw.PreferencesGroup, title: string, uri: string): void => {
       const row = new Adw.ActionRow({ title, activatable: true });
-      row.add_suffix(new Gtk.Image({ icon_name: "go-next-symbolic" }));
+      row.add_suffix(new Gtk.Image({ icon_name: "adw-external-link-symbolic" }));
       row.connect("activated", () => openExternalUri(uri));
       group.add(row);
     };
