@@ -53,13 +53,3 @@ jobs:
             notman@kbgjtn.github.io.shell-extension.zip \
             --title "Notman ${GITHUB_REF_NAME}" \
             --generate-notes
-
-      - name: Publish to extensions.gnome.org (optional)
-        if: ${{ vars.EGO_PUBLISH == 'true' }}
-        uses: murar8/gnome-extensions-action@v0.1.1
-        with:
-          source-dir: dist
-          username: ${{ secrets.GNOME_USERNAME }}
-          password: ${{ secrets.GNOME_PASSWORD }}
-          accept-tos: true
-          force: true
