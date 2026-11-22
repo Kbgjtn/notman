@@ -1,0 +1,16 @@
+# case=leak-dndoff res=1920x1080 run=2
+# shell_pid=260297 pin=2 timeout=90
+# dnd_show_banners=true
+# save_to_disk=false
+# settings=guard-enabled=false screenshot-notify-enabled=true screenshot-thumbnail-mode='full' screenshot-max-count=3 screenshot-expire-seconds=15 screenshot-memory-budget-mb=64 emergency-hard-cap=64 
+shot,rss_kb,delta_kb,active_count,estimated_bytes,pruned_count,shell_rss_bytes
+1,891092,96,2,16588800,570,912482304
+2,891164,168,2,16588800,570,912560128
+3,891276,280,5,41472000,570,912674816
+4,891360,364,5,41472000,570,912760832
+5,891464,468,7,58060800,570,912863232
+6,891536,540,7,58060800,570,912932864
+7,891480,484,7,58060800,570,912879616
+8,907560,16564,9,74649600,570,929341440
+9,931860,40864,9,74649600,570,954224640
+10,956160,65164,11,91238400,570,979107840

@@ -103,6 +103,9 @@ set_case_settings() {
       ;;
     cap)
       gsettings set "$NT_SETTINGS_SCHEMA" guard-enabled true
+      gsettings set "$NT_SETTINGS_SCHEMA" screenshot-max-count 0
+      gsettings set "$NT_SETTINGS_SCHEMA" screenshot-expire-seconds 0
+      gsettings set "$NT_SETTINGS_SCHEMA" screenshot-memory-budget-mb 0
       gsettings set "$NT_SETTINGS_SCHEMA" emergency-hard-cap 8
       ;;
     *)

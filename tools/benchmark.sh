@@ -80,6 +80,14 @@ for ((run = 1; run <= RUNS; run++)); do
     echo "shot,rss_kb,delta_kb,active_count,estimated_bytes,pruned_count,shell_rss_bytes"
   } > "$OUT"
 
+  # Normalise state between runs: otherwise later cases inherit stale
+  # notifications and RSS from earlier ones.
+  gdbus call --session \
+    --dest org.gnome.Shell.Extensions.Notman \
+    --object-path /org/gnome/Shell/Extensions/Notman \
+    --method org.gnome.Shell.Extensions.Notman.ClearScreenshots >/dev/null 2>&1 || true
+  sleep 1
+
   BASE_RSS="$(rss_kb)"
   echo "run $run: baseline rss=${BASE_RSS} kB"
 

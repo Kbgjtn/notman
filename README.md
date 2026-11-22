@@ -128,6 +128,10 @@ make benchmark CONFIRM=1 CASE=limit RES=1920x1080 RUNS=2
 make report   # writes results/report.md
 ```
 
+`results/report.md` aggregates every run. Notification counts and estimated
+thumbnail bytes are deterministic; RSS deltas are noisy because changing screen
+resolution and GLib GC affect the shell's baseline between runs.
+
 ## Layout
 
 ```

@@ -1,0 +1,16 @@
+# case=limit res=2560x1440 run=1
+# shell_pid=260297 pin=2 timeout=90
+# dnd_show_banners=false
+# save_to_disk=false
+# settings=guard-enabled=true screenshot-notify-enabled=true screenshot-thumbnail-mode='full' screenshot-max-count=3 screenshot-expire-seconds=15 screenshot-memory-budget-mb=64 emergency-hard-cap=64 
+shot,rss_kb,delta_kb,active_count,estimated_bytes,pruned_count,shell_rss_bytes
+1,944168,43068,0,0,762,966828032
+2,987368,86268,1,14745600,762,1025814528
+3,1030552,129452,1,14745600,762,1054904320
+4,1029592,128492,3,44236800,762,1054302208
+5,1029592,128492,3,44236800,762,1054302208
+6,1029624,128524,3,44236800,764,1054642176
+7,1029624,128524,3,44236800,764,1054334976
+8,1029628,128528,3,44236800,764,1054339072
+9,1037824,136724,3,44236800,767,1062731776
+10,1037856,136756,3,44236800,767,1062768640
