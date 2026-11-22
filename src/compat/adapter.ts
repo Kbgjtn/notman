@@ -19,6 +19,8 @@ export interface ShellAdapter {
   criticalUrgency(): number;
   dismissedReason(): number;
   getActiveNotifications(): unknown[];
+  getNotificationControlsRow(): unknown;
+  getDateMenuMenu(): unknown;
 }
 
 /**
