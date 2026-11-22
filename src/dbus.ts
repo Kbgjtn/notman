@@ -3,7 +3,7 @@ import GLib from "gi://GLib";
 
 import type { Disposables } from "./disposables.js";
 import type { Engine } from "./engine.js";
-import { logErr } from "./log.js";
+import { log } from "./log.js";
 
 const BUS_NAME = "org.gnome.Shell.Extensions.Notman";
 const OBJECT_PATH = "/org/gnome/Shell/Extensions/Notman";
@@ -33,7 +33,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
     if (!lookedUp) throw new Error("interface missing from generated node info");
     interfaceInfo = lookedUp;
   } catch (e) {
-    logErr(e, "notman: invalid D-Bus interface XML");
+    log.err("dbus", "invalid D-Bus interface XML", e);
     return false;
   }
 
@@ -114,14 +114,14 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
             }
           });
         } catch (e) {
-          logErr(e, "notman: D-Bus object registration failed");
+          log.err("dbus", "object registration failed", e);
         }
       },
       null,
       () => {},
     );
   } catch (e) {
-    logErr(e, "notman: D-Bus name acquisition failed");
+    log.err("dbus", "name acquisition failed", e);
     return false;
   }
 

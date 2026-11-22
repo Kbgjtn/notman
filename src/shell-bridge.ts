@@ -5,7 +5,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { estimateContentBytes } from "./byte-estimate.js";
 import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
 import type { Disposables } from "./disposables.js";
-import { debugLog, logErr } from "./log.js";
+import { log } from "./log.js";
 import type { NotificationHandle } from "./types.js";
 
 type SignalEmitter = {
@@ -78,7 +78,8 @@ export function createBridge(
       ids.set(target, id);
     }
     const estimatedBytes = estimateContentBytes(target.gicon);
-    debugLog(
+    log.debug(
+      "bridge",
       `handle id=${id} sourceKey=${sourceKey} bytes=${estimatedBytes} critical=${target.urgency === adapter.criticalUrgency()}`,
     );
     return {
@@ -98,19 +99,19 @@ export function createBridge(
           });
           downgraded.add(target);
         } catch (e) {
-          logErr(e, "notman: could not downgrade thumbnail");
+          log.err("bridge", "could not downgrade thumbnail", e);
         }
       },
       destroy: () => {
         if (destroyed.has(target) || stopped) return false;
-        debugLog(`destroy scheduled for id=${id}`);
+        log.debug("bridge", `destroy scheduled for id=${id}`);
         destroyed.add(target);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           pendingDestroys.delete(sourceId);
           try {
             target.destroy(adapter.dismissedReason());
           } catch (e) {
-            logErr(e, "notman: could not destroy notification");
+            log.err("bridge", "could not destroy notification", e);
           }
           return GLib.SOURCE_REMOVE;
         });
@@ -133,7 +134,8 @@ export function createBridge(
     attachedNotifications.add(notification);
 
     const source = (notification as { source?: unknown }).source;
-    debugLog(
+    log.debug(
+      "bridge",
       `notification attached sourceKey=${adapter.isScreenshotSource(source) ? "screenshot" : "other"} bytes=${estimateContentBytes((notification as { gicon?: unknown }).gicon)}`,
     );
     const signalId = emitter.connect(adapter.signals.destroy, () => {
@@ -159,7 +161,8 @@ export function createBridge(
     if (!source || typeof source !== "object" || seenSources.has(source)) return;
     seenSources.add(source);
     const matches = adapter.isScreenshotSource(source);
-    debugLog(
+    log.debug(
+      "bridge",
       `source title=${String((source as { title?: unknown }).title)} iconName=${String((source as { iconName?: unknown }).iconName)} screenshot=${matches}`,
     );
     if (!matches) return;
@@ -188,9 +191,9 @@ export function createBridge(
     capabilities,
 
     start(onAdded, onDestroyed) {
-      debugLog(`bridge start sources=${tray.getSources().length}`);
+      log.debug("bridge", `start sources=${tray.getSources().length}`);
       const sourceAddedId = tray.connect(adapter.signals.sourceAdded, (...args: unknown[]) => {
-        debugLog("source-added signal received");
+        log.debug("bridge", "source-added signal received");
         observeSource(args[0], onAdded, onDestroyed);
       });
       disposables.add(() => {

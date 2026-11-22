@@ -1,4 +1,4 @@
-import { logErr } from "./log.js";
+import { log } from "./log.js";
 
 /** Owns teardown callbacks and disposes them in reverse order. */
 export class Disposables {
@@ -24,7 +24,7 @@ export class Disposables {
       try {
         dispose();
       } catch (e) {
-        logErr(e, "notman: error during teardown");
+        log.err("disposables", "error during teardown", e);
       }
     }
   }

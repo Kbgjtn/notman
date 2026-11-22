@@ -1,6 +1,6 @@
 import type Gio from "gi://Gio";
 
-import { logErr } from "./log.js";
+import { log } from "./log.js";
 import type { RuleSettings, ThumbnailMode } from "./types.js";
 
 const DEFAULTS: RuleSettings = {
@@ -40,7 +40,7 @@ export class SettingsStore {
   private warn(key: string, error: unknown): void {
     if (this._warned.has(key)) return;
     this._warned.add(key);
-    logErr(error, `notman: unreadable setting '${key}', using default`);
+    log.err("settings", `unreadable setting '${key}', using default`, error);
   }
 
   read(): RuleSettings {
@@ -66,7 +66,7 @@ export class SettingsStore {
     try {
       this._settings.set_boolean("screenshot-notify-enabled", enabled);
     } catch (e) {
-      logErr(e, "notman: could not persist screenshot-notify-enabled");
+      log.err("settings", "could not persist screenshot-notify-enabled", e);
     }
   }
 
@@ -74,7 +74,7 @@ export class SettingsStore {
     try {
       this._settings.set_int("screenshot-max-count", count);
     } catch (e) {
-      logErr(e, "notman: could not persist screenshot-max-count");
+      log.err("settings", "could not persist screenshot-max-count", e);
     }
   }
 }

@@ -1,6 +1,6 @@
 import GLib from "gi://GLib";
 
-import { logErr } from "./log.js";
+import { log } from "./log.js";
 import type { Scheduler } from "./scheduler.js";
 
 export class GlibScheduler implements Scheduler {
@@ -10,7 +10,7 @@ export class GlibScheduler implements Scheduler {
       try {
         callback();
       } catch (e) {
-        logErr(e, "notman: scheduled sweep failed");
+        log.err("scheduler", "scheduled sweep failed", e);
       }
       return GLib.SOURCE_CONTINUE;
     });

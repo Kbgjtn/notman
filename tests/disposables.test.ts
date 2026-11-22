@@ -35,7 +35,9 @@ describe("Disposables", () => {
 
     expect(calls).toEqual([3, 1]);
     expect(logError).toHaveBeenCalledOnce();
-    expect(logError.mock.calls[0][1]).toBe("notman: error during teardown");
+    expect(logError.mock.calls[0][1]).toBe(
+      "err(disposables): error during teardown | teardown failed",
+    );
   });
 
   it("can remove a disposer before teardown", () => {

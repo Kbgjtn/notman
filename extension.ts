@@ -5,7 +5,7 @@ import { registerDbus } from "./src/dbus.js";
 import { Disposables } from "./src/disposables.js";
 import { Engine } from "./src/engine.js";
 import { GlibScheduler } from "./src/glib-scheduler.js";
-import { debugLog, logErr, setDebugEnabled } from "./src/log.js";
+import { log } from "./src/log.js";
 import { SettingsStore } from "./src/settings.js";
 import { createBridge } from "./src/shell-bridge.js";
 
@@ -19,31 +19,33 @@ export default class NotmanExtension extends Extension {
       const version = versions?.[0] ?? "";
       const adapter = detectAdapter(version);
       if (!adapter) {
-        log(`notman: unsupported shell version '${version}', guard not enabled`);
+        log.info("extension", `unsupported shell version '${version}'`);
         return;
       }
 
       const capabilities = adapter.probe();
       if (!capabilities.tray) {
-        log("notman: message tray unavailable, guard not enabled");
+        log.info("extension", "message tray unavailable, guard not enabled");
         return;
       }
 
       const rawSettings = this.getSettings();
       try {
-        setDebugEnabled(rawSettings.get_boolean("debug-logging"));
+        log.setDebugEnabled(rawSettings.get_boolean("debug-logging"));
       } catch (e) {
-        logErr(e, "notman: could not read debug-logging");
+        log.err("extension", "could not read debug-logging", e);
       }
-      debugLog(
+      log.debug(
+        "extension",
         `enable adapter=${adapter.id} tray=${capabilities.tray} panel=${capabilities.panel}`,
       );
+
       const settings = new SettingsStore(rawSettings);
       const disposables = new Disposables();
       const bridge = createBridge(adapter, capabilities, disposables);
       if (!bridge) {
         disposables.dispose();
-        log("notman: shell bridge unavailable, guard not enabled");
+        log.info("extension", "shell bridge unavailable, guard not enabled");
         return;
       }
 
@@ -51,19 +53,19 @@ export default class NotmanExtension extends Extension {
       const engine = new Engine(settings, bridge, adapter.id, tier, new GlibScheduler());
       if (!engine.start()) {
         disposables.dispose();
-        log("notman: engine failed to start");
+        log.info("extension", "engine failed to start");
         return;
       }
 
-      // Publish the references before registering D-Bus: its callback is
+      // Publish references before registering D-Bus: its callback is
       // asynchronous and a failure must still be fully teardown-able.
       this._engine = engine;
       this._disposables = disposables;
       if (!registerDbus(engine, disposables))
-        log("notman: D-Bus API unavailable, guard still active");
-      log(`notman: enabled (adapter=${adapter.id}, tier=${tier})`);
+        log.warn("extension", "D-Bus API unavailable, guard still active");
+      log.info("extension", `enabled adapter=${adapter.id} tier=${tier}`);
     } catch (e) {
-      logErr(e, "notman: enable failed");
+      log.err("extension", "enable failed", e);
       this.disable();
     }
   }
@@ -72,15 +74,15 @@ export default class NotmanExtension extends Extension {
     try {
       this._engine?.stop();
     } catch (e) {
-      logErr(e, "notman: engine stop failed");
+      log.err("extension", "engine stop failed", e);
     }
     try {
       this._disposables?.dispose();
     } catch (e) {
-      logErr(e, "notman: teardown failed");
+      log.err("extension", "teardown failed", e);
     }
     this._engine = null;
     this._disposables = null;
-    setDebugEnabled(false);
+    log.setDebugEnabled(false);
   }
 }
