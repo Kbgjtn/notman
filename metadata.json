@@ -1,0 +1,8 @@
+{
+  "name": "Notman",
+  "description": "Notification manager for GNOME Shell: exposes retention, expiry and memory policies the shell keeps hidden. Screenshot notifications first.",
+  "uuid": "notman@ozy.local",
+  "url": "https://github.com/ozy/notman",
+  "settings-schema": "org.gnome.shell.extensions.notman",
+  "shell-version": ["46"]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "notman",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GNOME Shell extension exposing hidden notification-list policies",
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "@girs/gjs": "*",
+    "@girs/gnome-shell": "*",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

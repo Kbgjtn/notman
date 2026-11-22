@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.zip
+.ideas/
+schemas/gschemas.compiled
+results/*.tmp

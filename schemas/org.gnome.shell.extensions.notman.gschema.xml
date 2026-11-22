@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="notman">
+  <schema id="org.gnome.shell.extensions.notman"
+          path="/org/gnome/shell/extensions/notman/">
+
+    <key name="guard-enabled" type="b">
+      <default>true</default>
+      <summary>Master guard</summary>
+      <description>
+        Master opt-out. When false, no retention or expiry rules are enforced.
+      </description>
+    </key>
+
+    <key name="screenshot-notify-enabled" type="b">
+      <default>true</default>
+      <summary>Allow screenshot notifications</summary>
+      <description>
+        When false, screenshot notifications are discarded as soon as they are
+        received. Opt-out for the screenshot rule.
+      </description>
+    </key>
+
+    <key name="screenshot-thumbnail-mode" type="s">
+      <default>'full'</default>
+      <choices>
+        <choice value='full'/>
+        <choice value='text-only'/>
+      </choices>
+      <summary>Screenshot thumbnail handling</summary>
+      <description>
+        "full" keeps the full-resolution image in the notification.
+        "text-only" replaces it with a small themed icon, releasing the
+        full-size texture while keeping the notification text and actions.
+      </description>
+    </key>
+
+    <key name="screenshot-max-count" type="i">
+      <default>3</default>
+      <range min="0" max="1000"/>
+      <summary>Maximum retained screenshot notifications</summary>
+      <description>
+        Oldest screenshot notifications are destroyed beyond this count.
+        Zero means unlimited, subject to emergency-hard-cap.
+      </description>
+    </key>
+
+    <key name="screenshot-expire-seconds" type="i">
+      <default>15</default>
+      <range min="0" max="86400"/>
+      <summary>Screenshot notification expiry</summary>
+      <description>
+        Seconds before a screenshot notification is destroyed. Zero disables
+        expiry. This closes the GNOME Do-Not-Disturb transient-notification leak.
+      </description>
+    </key>
+
+    <key name="screenshot-memory-budget-mb" type="i">
+      <default>64</default>
+      <range min="0" max="4096"/>
+      <summary>Estimated screenshot thumbnail memory budget</summary>
+      <description>
+        Prunes oldest screenshot notifications when the estimated texture
+        memory exceeds this many MiB. Zero disables the budget.
+      </description>
+    </key>
+
+    <key name="emergency-hard-cap" type="i">
+      <default>64</default>
+      <range min="0" max="10000"/>
+      <summary>Emergency hard cap on tracked notifications</summary>
+      <description>
+        Last-resort bound so the guard cannot be disarmed into causing the very
+        memory growth it prevents. Zero disables the cap and logs a warning.
+      </description>
+    </key>
+
+    <key name="clear-on-panel-open" type="b">
+      <default>false</default>
+      <summary>Clear screenshot notifications when the panel opens</summary>
+    </key>
+
+    <key name="show-stats" type="b">
+      <default>true</default>
+      <summary>Show live counters in the panel popover</summary>
+    </key>
+
+    <key name="debug-logging" type="b">
+      <default>false</default>
+      <summary>Verbose logging for development</summary>
+    </key>
+  </schema>
+</schemalist>
