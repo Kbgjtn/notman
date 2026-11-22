@@ -39,6 +39,27 @@ const PREFS_CSS = `
   background-color: @card_bg_color;
   padding: 14px 10px;
 }
+.notman-stat-active {
+  background-color: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.28);
+}
+.notman-stat-active .notman-stat-accent {
+  color: #38bdf8;
+}
+.notman-stat-cleaned {
+  background-color: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+.notman-stat-cleaned .notman-stat-accent {
+  color: #fbbf24;
+}
+.notman-stat-saved {
+  background-color: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.28);
+}
+.notman-stat-saved .notman-stat-accent {
+  color: #34d399;
+}
 `;
 
 interface LiveStats {
@@ -216,28 +237,42 @@ export default class NotmanPreferences extends ExtensionPreferences {
       homogeneous: true,
       spacing: 10,
     });
-    const makeStatTile = (caption: string): Gtk.Label => {
+    const makeStatTile = (caption: string, iconName: string, toneClass: string): Gtk.Label => {
       const tile = new Gtk.Box({
         orientation: Gtk.Orientation.VERTICAL,
-        spacing: 4,
-        css_classes: ["notman-stat-card"],
+        spacing: 6,
+        css_classes: ["notman-stat-card", toneClass],
       });
       const value = new Gtk.Label({
         label: "—",
-        css_classes: ["title-2"],
+        css_classes: ["title-2", "notman-stat-accent"],
       });
-      const label = new Gtk.Label({
-        label: caption,
-        css_classes: ["caption", "dim-label"],
+      const footer = new Gtk.Box({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        spacing: 4,
+        halign: Gtk.Align.CENTER,
       });
+      footer.append(
+        new Gtk.Image({
+          icon_name: iconName,
+          pixel_size: 13,
+          css_classes: ["notman-stat-accent"],
+        }),
+      );
+      footer.append(
+        new Gtk.Label({
+          label: caption,
+          css_classes: ["caption", "dim-label"],
+        }),
+      );
       tile.append(value);
-      tile.append(label);
+      tile.append(footer);
       statsGrid.append(tile);
       return value;
     };
-    const activeVal = makeStatTile(_("Active"));
-    const cleanedVal = makeStatTile(_("Cleaned"));
-    const savedVal = makeStatTile(_("RAM saved"));
+    const activeVal = makeStatTile(_("Active"), "go-up-symbolic", "notman-stat-active");
+    const cleanedVal = makeStatTile(_("Cleaned"), "go-down-symbolic", "notman-stat-cleaned");
+    const savedVal = makeStatTile(_("RAM saved"), "emblem-ok-symbolic", "notman-stat-saved");
     statusGroup.add(statsGrid);
     generalPage.add(statusGroup);
 

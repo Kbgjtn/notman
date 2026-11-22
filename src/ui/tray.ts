@@ -280,35 +280,47 @@ export class TrayIndicator {
       x_expand: true,
       x_align: Clutter.ActorAlign.FILL,
       style_class: "notman-stats-card",
-      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 0 }),
+      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 6 }),
     });
 
-    const makeCol = (caption: string): St.Label => {
+    const makeCol = (caption: string, iconName: string, toneClass: string): St.Label => {
       const col = new St.BoxLayout({
         vertical: true,
         x_expand: true,
-        x_align: Clutter.ActorAlign.CENTER,
-        style_class: "notman-stat-col",
+        x_align: Clutter.ActorAlign.FILL,
+        style_class: `notman-stat-tile ${toneClass}`,
       });
       const value = new St.Label({
         text: "0",
         x_align: Clutter.ActorAlign.CENTER,
         style_class: "notman-stat-value",
       });
-      const label = new St.Label({
-        text: caption,
+      const footer = new St.BoxLayout({
         x_align: Clutter.ActorAlign.CENTER,
-        style_class: "notman-stat-label",
+        layout_manager: new Clutter.BoxLayout({ spacing: 4 }),
       });
+      footer.add_child(
+        new St.Icon({
+          icon_name: iconName,
+          icon_size: 12,
+          style_class: "notman-stat-icon",
+        }),
+      );
+      footer.add_child(
+        new St.Label({
+          text: caption,
+          style_class: "notman-stat-label",
+        }),
+      );
       col.add_child(value);
-      col.add_child(label);
+      col.add_child(footer);
       card.add_child(col);
       return value;
     };
 
-    const activeValue = makeCol(_("Active"));
-    const cleanedValue = makeCol(_("Cleaned"));
-    const savedValue = makeCol(_("Saved"));
+    const activeValue = makeCol(_("Active"), "go-up-symbolic", "notman-stat-active");
+    const cleanedValue = makeCol(_("Cleaned"), "go-down-symbolic", "notman-stat-cleaned");
+    const savedValue = makeCol(_("Saved"), "emblem-ok-symbolic", "notman-stat-saved");
 
     row.add_child(card);
     this._indicator.menu.addMenuItem(row);

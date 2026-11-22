@@ -33,24 +33,49 @@
   font-weight: 600;
 }
 
-.notman-stats-card {
-  border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.05);
+.notman-stat-tile {
+  border-radius: 9px;
+  padding: 7px 6px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 8px 4px;
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
-.notman-stat-col {
-  padding: 2px 6px;
+.notman-stat-active {
+  background-color: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.24);
+}
+
+.notman-stat-cleaned {
+  background-color: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.24);
+}
+
+.notman-stat-saved {
+  background-color: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.24);
 }
 
 .notman-stat-value {
-  font-size: 1.05em;
+  font-size: 1.02em;
   font-weight: 700;
-  color: #ffffff;
 }
 
 .notman-stat-label {
-  font-size: 0.78em;
-  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.76em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.notman-stat-active .notman-stat-value,
+.notman-stat-active .notman-stat-icon {
+  color: #38bdf8;
+}
+
+.notman-stat-cleaned .notman-stat-value,
+.notman-stat-cleaned .notman-stat-icon {
+  color: #fbbf24;
+}
+
+.notman-stat-saved .notman-stat-value,
+.notman-stat-saved .notman-stat-icon {
+  color: #34d399;
 }
