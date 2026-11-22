@@ -163,6 +163,39 @@
       </description>
     </key>
 
+    <key name="app-rules" type="s">
+      <default>'[]'</default>
+      <summary>Per-application notification rules</summary>
+      <description>
+        JSON array of per-app overrides (match, muted, maxCount, expireSeconds).
+      </description>
+    </key>
+
+    <key name="quiet-hours-enabled" type="b">
+      <default>false</default>
+      <summary>Enable scheduled Do Not Disturb (Quiet hours)</summary>
+      <description>
+        Automatically mute notification banners during the configured daily
+        quiet-hours window.
+      </description>
+    </key>
+
+    <key name="quiet-hours-start" type="s">
+      <default>'22:00'</default>
+      <summary>Quiet hours start time (HH:MM)</summary>
+      <description>
+        24-hour local time when scheduled Do Not Disturb begins.
+      </description>
+    </key>
+
+    <key name="quiet-hours-end" type="s">
+      <default>'08:00'</default>
+      <summary>Quiet hours end time (HH:MM)</summary>
+      <description>
+        24-hour local time when scheduled Do Not Disturb ends.
+      </description>
+    </key>
+
     <key name="show-indicator" type="b">
       <default>true</default>
       <summary>Show top-bar indicator</summary>

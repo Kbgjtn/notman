@@ -1,3 +1,4 @@
+import Gio from "gi://Gio";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 
 import { detectAdapter } from "./src/compat/adapter.js";
@@ -6,6 +7,7 @@ import { Disposables } from "./src/disposables.js";
 import { Engine } from "./src/engine.js";
 import { GlibScheduler } from "./src/glib-scheduler.js";
 import { log } from "./src/log.js";
+import { QuietHoursController } from "./src/quiet-hours.js";
 import { parseIndicatorPosition, SettingKey, SettingsStore } from "./src/settings.js";
 import { ShellBridge } from "./src/shell-bridge.js";
 import { CapabilityTier, type IndicatorPosition, type SignalEmitter } from "./src/types.js";
@@ -67,13 +69,51 @@ export default class NotmanExtension extends Extension {
       }
 
       const tier = capabilities.topBar ? CapabilityTier.TopBar : CapabilityTier.Headless;
-      const engine = new Engine(settings, bridge, adapter.id, tier, new GlibScheduler());
+      const scheduler = new GlibScheduler();
+      const engine = new Engine(settings, bridge, adapter.id, tier, scheduler);
       if (!engine.start()) {
         this.disable();
         log.info("extension", "engine failed to start");
         return;
       }
       this._engine = engine;
+
+      // Scheduled Do Not Disturb (Quiet hours).
+      try {
+        const desktopNotifications = new Gio.Settings({
+          schema_id: "org.gnome.desktop.notifications",
+        });
+        const quietHours = new QuietHoursController(
+          () => ({
+            enabled: rawSettings.get_boolean(SettingKey.QuietHoursEnabled),
+            start: rawSettings.get_string(SettingKey.QuietHoursStart),
+            end: rawSettings.get_string(SettingKey.QuietHoursEnd),
+          }),
+          {
+            getShowBanners: () => desktopNotifications.get_boolean("show-banners"),
+            setShowBanners: (show) => desktopNotifications.set_boolean("show-banners", show),
+          },
+          scheduler,
+        );
+        quietHours.start();
+        const quietIds = [
+          rawSettings.connect(`changed::${SettingKey.QuietHoursEnabled}`, () => quietHours.sync()),
+          rawSettings.connect(`changed::${SettingKey.QuietHoursStart}`, () => quietHours.sync()),
+          rawSettings.connect(`changed::${SettingKey.QuietHoursEnd}`, () => quietHours.sync()),
+        ];
+        disposables.add(() => {
+          for (const id of quietIds) {
+            try {
+              rawSettings.disconnect(id);
+            } catch {
+              // Settings may already be gone.
+            }
+          }
+          quietHours.stop();
+        });
+      } catch (e) {
+        log.warn("extension", `quiet hours unavailable: ${String(e)}`);
+      }
 
       // Clear screenshot notifications when the notification list opens, if enabled.
       const dateMenu = adapter.getDateMenuMenu() as SignalEmitter | null;

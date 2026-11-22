@@ -9,9 +9,16 @@ import {
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
 import { formatBytes } from "./src/byte-estimate.js";
+import { exportSettingsJson, importSettingsJson } from "./src/config-io.js";
 import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
-import { parseIndicatorPosition, parseThumbnailMode, SettingKey } from "./src/settings.js";
-import { IndicatorPosition, ThumbnailMode } from "./src/types.js";
+import { formatTimeMinutes, parseTimeMinutes } from "./src/quiet-hours.js";
+import {
+  parseAppRules,
+  parseIndicatorPosition,
+  parseThumbnailMode,
+  SettingKey,
+} from "./src/settings.js";
+import { type AppRuleEntry, IndicatorPosition, ThumbnailMode } from "./src/types.js";
 
 const PREFS_CSS = `
 .notman-mode-frame {
@@ -20,18 +27,18 @@ const PREFS_CSS = `
   background-color: @card_bg_color;
   padding: 6px;
 }
-.notman-mode-card {
+button.notman-mode-card {
   border-radius: 9px;
   padding: 12px 10px;
   border: 1px solid transparent;
   background-color: transparent;
 }
-.notman-mode-card:hover {
-  background-color: alpha(@window_fg_color, 0.05);
+button.notman-mode-card:hover {
+  background-color: alpha(@window_fg_color, 0.06);
 }
-.notman-mode-card:checked {
-  background-color: alpha(@accent_bg_color, 0.16);
-  border-color: @accent_bg_color;
+button.notman-mode-card:checked {
+  background-color: alpha(@window_fg_color, 0.13);
+  border-color: alpha(@window_fg_color, 0.28);
 }
 .notman-stat-box {
   border-radius: 12px;
@@ -386,6 +393,84 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }
     generalPage.add(topBarGroup);
 
+    const quietGroup = new Adw.PreferencesGroup({
+      title: _("Quiet hours"),
+      description: _("Automatically turn on Do Not Disturb on a daily schedule."),
+    });
+    addHeaderSwitch(quietGroup, SettingKey.QuietHoursEnabled);
+
+    const addTimeRow = (key: SettingKey, title: string, fallback: string): Adw.ActionRow => {
+      const row = new Adw.ActionRow({ title });
+      const initial = parseTimeMinutes(settings.get_string(key)) ?? parseTimeMinutes(fallback) ?? 0;
+      const hourSpin = new Gtk.SpinButton({
+        adjustment: new Gtk.Adjustment({
+          lower: 0,
+          upper: 23,
+          step_increment: 1,
+          value: Math.floor(initial / 60),
+        }),
+        wrap: true,
+        width_chars: 2,
+        valign: Gtk.Align.CENTER,
+      });
+      const minSpin = new Gtk.SpinButton({
+        adjustment: new Gtk.Adjustment({
+          lower: 0,
+          upper: 55,
+          step_increment: 5,
+          value: Math.floor((initial % 60) / 5) * 5,
+        }),
+        wrap: true,
+        width_chars: 2,
+        valign: Gtk.Align.CENTER,
+      });
+      const formatTwoDigit = (spin: Gtk.SpinButton): boolean => {
+        spin.set_text(String(Math.round(spin.get_value())).padStart(2, "0"));
+        return true;
+      };
+      hourSpin.connect("output", () => formatTwoDigit(hourSpin));
+      minSpin.connect("output", () => formatTwoDigit(minSpin));
+      formatTwoDigit(hourSpin);
+      formatTwoDigit(minSpin);
+
+      let syncing = false;
+      const persist = (): void => {
+        if (syncing) return;
+        settings.set_string(key, formatTimeMinutes(hourSpin.get_value(), minSpin.get_value()));
+      };
+      hourSpin.connect("value-changed", persist);
+      minSpin.connect("value-changed", persist);
+      signalIds.push(
+        settings.connect(`changed::${key}`, () => {
+          const parsed = parseTimeMinutes(settings.get_string(key));
+          if (parsed === null) return;
+          syncing = true;
+          hourSpin.set_value(Math.floor(parsed / 60));
+          minSpin.set_value(parsed % 60);
+          syncing = false;
+        }),
+      );
+
+      const timeBox = new Gtk.Box({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        spacing: 4,
+        valign: Gtk.Align.CENTER,
+      });
+      timeBox.append(hourSpin);
+      timeBox.append(new Gtk.Label({ label: ":" }));
+      timeBox.append(minSpin);
+      row.add_suffix(timeBox);
+      quietGroup.add(row);
+      return row;
+    };
+
+    const quietStartRow = addTimeRow(SettingKey.QuietHoursStart, _("Starts at"), "22:00");
+    const quietEndRow = addTimeRow(SettingKey.QuietHoursEnd, _("Ends at"), "08:00");
+    for (const dependentRow of [quietStartRow, quietEndRow]) {
+      bind(SettingKey.QuietHoursEnabled, dependentRow, "sensitive", Gio.SettingsBindFlags.GET);
+    }
+    generalPage.add(quietGroup);
+
     const screenshotsPage = new Adw.PreferencesPage({
       title: _("Captures"),
       icon_name: "camera-photo-symbolic",
@@ -626,6 +711,129 @@ export default class NotmanPreferences extends ExtensionPreferences {
     );
     retentionPage.add(retentionGroup);
 
+    const appRulesGroup = new Adw.PreferencesGroup({
+      title: _("Per-app rules"),
+      description: _("Custom mute, count, or expiry overrides matched by app name or ID."),
+    });
+    bind(SettingKey.GuardEnabled, appRulesGroup, "sensitive", Gio.SettingsBindFlags.GET);
+
+    const addRuleRow = new Adw.EntryRow({
+      title: _("App name or ID (e.g. slack, firefox, discord)"),
+    });
+    const addRuleBtn = new Gtk.Button({
+      label: _("Add"),
+      valign: Gtk.Align.CENTER,
+      css_classes: ["suggested-action"],
+    });
+    addRuleRow.add_suffix(addRuleBtn);
+    appRulesGroup.add(addRuleRow);
+
+    const renderedRuleRows: Adw.ExpanderRow[] = [];
+    const writeAppRules = (rules: AppRuleEntry[]): void => {
+      settings.set_string(SettingKey.AppRules, JSON.stringify(rules));
+    };
+
+    const rebuildAppRuleRows = (): void => {
+      while (renderedRuleRows.length > 0) {
+        const old = renderedRuleRows.pop();
+        if (old) appRulesGroup.remove(old);
+      }
+      const rules = parseAppRules(settings.get_string(SettingKey.AppRules));
+      for (let idx = 0; idx < rules.length; idx++) {
+        const entry = rules[idx];
+        const summaryParts: string[] = [];
+        if (entry.muted) summaryParts.push(_("Muted"));
+        if (!entry.muted && entry.maxCount > 0) summaryParts.push(`${_("Max")} ${entry.maxCount}`);
+        if (!entry.muted && entry.expireSeconds > 0) summaryParts.push(`${entry.expireSeconds}s`);
+        const expander = new Adw.ExpanderRow({
+          title: entry.match,
+          subtitle: summaryParts.length > 0 ? summaryParts.join(" · ") : _("No limits set"),
+        });
+
+        const muteRow = new Adw.SwitchRow({
+          title: _("Mute"),
+          subtitle: _("Dismiss alerts from this app immediately."),
+          active: entry.muted,
+        });
+        muteRow.connect("notify::active", () => {
+          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
+          if (!next[idx]) return;
+          next[idx] = { ...next[idx], muted: muteRow.active };
+          writeAppRules(next);
+        });
+        expander.add_row(muteRow);
+
+        const maxRow = new Adw.SpinRow({
+          title: _("Max kept"),
+          adjustment: new Gtk.Adjustment({
+            lower: 0,
+            upper: 100,
+            step_increment: 1,
+            value: entry.maxCount,
+          }),
+          sensitive: !entry.muted,
+        });
+        maxRow.connect("notify::value", () => {
+          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
+          if (!next[idx]) return;
+          next[idx] = { ...next[idx], maxCount: Math.round(maxRow.value) };
+          writeAppRules(next);
+        });
+        expander.add_row(maxRow);
+
+        const expRow = new Adw.SpinRow({
+          title: _("Clear after (seconds)"),
+          adjustment: new Gtk.Adjustment({
+            lower: 0,
+            upper: 3600,
+            step_increment: 5,
+            value: entry.expireSeconds,
+          }),
+          sensitive: !entry.muted,
+        });
+        expRow.connect("notify::value", () => {
+          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
+          if (!next[idx]) return;
+          next[idx] = { ...next[idx], expireSeconds: Math.round(expRow.value) };
+          writeAppRules(next);
+        });
+        expander.add_row(expRow);
+
+        const removeBtn = new Gtk.Button({
+          label: _("Remove"),
+          valign: Gtk.Align.CENTER,
+          css_classes: ["destructive-action"],
+        });
+        removeBtn.connect("clicked", () => {
+          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
+          next.splice(idx, 1);
+          writeAppRules(next);
+        });
+        const removeRow = new Adw.ActionRow({ title: _("Remove rule") });
+        removeRow.add_suffix(removeBtn);
+        expander.add_row(removeRow);
+
+        appRulesGroup.add(expander);
+        renderedRuleRows.push(expander);
+      }
+    };
+
+    const addRuleFromEntry = (): void => {
+      const match = addRuleRow.text.trim();
+      if (!match) return;
+      const rules = parseAppRules(settings.get_string(SettingKey.AppRules));
+      if (!rules.some((r) => r.match.toLowerCase() === match.toLowerCase())) {
+        rules.push({ match, muted: false, maxCount: 2, expireSeconds: 0 });
+        writeAppRules(rules);
+      }
+      addRuleRow.text = "";
+    };
+    addRuleBtn.connect("clicked", addRuleFromEntry);
+    addRuleRow.connect("entry-activated", addRuleFromEntry);
+    rebuildAppRuleRows();
+    signalIds.push(settings.connect(`changed::${SettingKey.AppRules}`, rebuildAppRuleRows));
+    retentionPage.add(appRulesGroup);
+
     const aboutPage = new Adw.PreferencesPage({
       title: _("About"),
       icon_name: "help-about-symbolic",
@@ -649,6 +857,101 @@ export default class NotmanPreferences extends ExtensionPreferences {
       _("Debug logging"),
       _("Write extra logs to the system journal."),
     );
+
+    const showToast = (title: string): void => {
+      try {
+        window.add_toast(new Adw.Toast({ title }));
+      } catch {
+        // Ignore if window is closing.
+      }
+    };
+
+    const exportBtn = new Gtk.Button({
+      label: _("Export"),
+      valign: Gtk.Align.CENTER,
+    });
+    exportBtn.connect("clicked", () => {
+      const dialog = new Gtk.FileDialog({
+        title: _("Export Notman settings"),
+        initial_name: "notman-settings.json",
+      });
+      dialog.save(window, null, (_dlg, result) => {
+        try {
+          const file = dialog.save_finish(result);
+          if (!file) return;
+          const payload = new TextEncoder().encode(exportSettingsJson(settings as never));
+          file.replace_contents_async(
+            payload,
+            null,
+            false,
+            Gio.FileCreateFlags.REPLACE_DESTINATION,
+            null,
+            (_f, writeRes) => {
+              try {
+                file.replace_contents_finish(writeRes);
+                showToast(_("Settings exported"));
+              } catch {
+                showToast(_("Could not save settings file"));
+              }
+            },
+          );
+        } catch {
+          // User cancelled dialog.
+        }
+      });
+    });
+    const exportRow = new Adw.ActionRow({
+      title: _("Export settings"),
+      subtitle: _("Save your configuration to a JSON file."),
+    });
+    exportRow.add_suffix(exportBtn);
+    advancedGroup.add(exportRow);
+
+    const importBtn = new Gtk.Button({
+      label: _("Import"),
+      valign: Gtk.Align.CENTER,
+    });
+    importBtn.connect("clicked", () => {
+      const filter = new Gtk.FileFilter();
+      filter.set_name(_("JSON files"));
+      filter.add_pattern("*.json");
+      const filters = new Gio.ListStore({ item_type: Gtk.FileFilter.$gtype });
+      filters.append(filter);
+      const dialog = new Gtk.FileDialog({
+        title: _("Import Notman settings"),
+        filters,
+      });
+      dialog.open(window, null, (_dlg, result) => {
+        try {
+          const file = dialog.open_finish(result);
+          if (!file) return;
+          file.load_contents_async(null, (_f, loadRes) => {
+            try {
+              const [ok, bytes] = file.load_contents_finish(loadRes);
+              if (!ok) {
+                showToast(_("Could not read settings file"));
+                return;
+              }
+              const count = importSettingsJson(
+                new TextDecoder("utf-8").decode(bytes),
+                settings as never,
+              );
+              showToast(`${_("Imported")} ${count} ${_("settings")}`);
+            } catch {
+              showToast(_("Invalid settings file"));
+            }
+          });
+        } catch {
+          // User cancelled dialog.
+        }
+      });
+    });
+    const importRow = new Adw.ActionRow({
+      title: _("Import settings"),
+      subtitle: _("Load a configuration from a JSON file."),
+    });
+    importRow.add_suffix(importBtn);
+    advancedGroup.add(importRow);
 
     const resetButton = new Gtk.Button({
       label: _("Reset"),

@@ -1,7 +1,7 @@
 import type Gio from "gi://Gio";
 
 import { log } from "./log.js";
-import { IndicatorPosition, type RuleSettings, ThumbnailMode } from "./types.js";
+import { type AppRuleEntry, IndicatorPosition, type RuleSettings, ThumbnailMode } from "./types.js";
 
 export enum SettingKey {
   GuardEnabled = "guard-enabled",
@@ -20,6 +20,10 @@ export enum SettingKey {
   BurstLimitEnabled = "burst-limit-enabled",
   BurstWindowSeconds = "burst-window-seconds",
   BurstMaxPerSource = "burst-max-per-source",
+  AppRules = "app-rules",
+  QuietHoursEnabled = "quiet-hours-enabled",
+  QuietHoursStart = "quiet-hours-start",
+  QuietHoursEnd = "quiet-hours-end",
   ShowIndicator = "show-indicator",
   IndicatorPosition = "indicator-position",
   IndicatorIndex = "indicator-index",
@@ -44,6 +48,7 @@ const DEFAULTS: RuleSettings = {
   burstLimitEnabled: false,
   burstWindowSeconds: 10,
   burstMaxPerSource: 3,
+  appRules: [],
 };
 
 const RULE_KEYS = new Set<string>([
@@ -63,6 +68,7 @@ const RULE_KEYS = new Set<string>([
   SettingKey.BurstLimitEnabled,
   SettingKey.BurstWindowSeconds,
   SettingKey.BurstMaxPerSource,
+  SettingKey.AppRules,
 ]);
 
 export function parseThumbnailMode(raw: string): ThumbnailMode {
@@ -75,6 +81,35 @@ export function parseIndicatorPosition(raw: string): IndicatorPosition {
   if (raw === IndicatorPosition.Left) return IndicatorPosition.Left;
   if (raw === IndicatorPosition.Center) return IndicatorPosition.Center;
   return IndicatorPosition.Right;
+}
+
+function clampRange(value: unknown, min: number, max: number): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return min;
+  return Math.min(max, Math.max(min, Math.round(num)));
+}
+
+export function parseAppRules(raw: string): AppRuleEntry[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const rules: AppRuleEntry[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item as Record<string, unknown>;
+      const match = typeof rec.match === "string" ? rec.match.trim() : "";
+      if (!match) continue;
+      rules.push({
+        match,
+        muted: Boolean(rec.muted),
+        maxCount: clampRange(rec.maxCount ?? 0, 0, 100),
+        expireSeconds: clampRange(rec.expireSeconds ?? 0, 0, 3600),
+      });
+    }
+    return rules;
+  } catch {
+    return [];
+  }
 }
 
 function clampMaxCount(value: number): number {
@@ -143,6 +178,12 @@ export class SettingsStore {
       this.warn(SettingKey.ScreenshotThumbnailMode, e);
     }
     const thumbnailMode = parseThumbnailMode(rawMode);
+    let rawAppRules = "[]";
+    try {
+      rawAppRules = this._settings.get_string(SettingKey.AppRules);
+    } catch (e) {
+      this.warn(SettingKey.AppRules, e);
+    }
     const snapshot: RuleSettings = {
       guardEnabled: this.getBoolean(SettingKey.GuardEnabled, DEFAULTS.guardEnabled),
       notifyEnabled: this.getBoolean(SettingKey.ScreenshotNotifyEnabled, DEFAULTS.notifyEnabled),
@@ -172,6 +213,7 @@ export class SettingsStore {
       burstLimitEnabled: this.getBoolean(SettingKey.BurstLimitEnabled, DEFAULTS.burstLimitEnabled),
       burstWindowSeconds: this.getInt(SettingKey.BurstWindowSeconds, DEFAULTS.burstWindowSeconds),
       burstMaxPerSource: this.getInt(SettingKey.BurstMaxPerSource, DEFAULTS.burstMaxPerSource),
+      appRules: parseAppRules(rawAppRules),
     };
     if (this._changedId !== null) this._cache = snapshot;
     return snapshot;

@@ -1,4 +1,5 @@
 import { log } from "./log.js";
+import { AppRule } from "./rules/app.js";
 import { BurstRule } from "./rules/burst.js";
 import { CapRule } from "./rules/cap.js";
 import { RetentionRule } from "./rules/retention.js";
@@ -23,6 +24,7 @@ export class Engine {
   private readonly _rules: Rule[] = [
     new ScreenshotRule(),
     new ScreencastRule(),
+    new AppRule(),
     new BurstRule(),
     new TransientRule(),
     new RetentionRule(),

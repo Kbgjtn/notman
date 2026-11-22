@@ -26,6 +26,13 @@ export interface SignalEmitter {
   disconnect(id: number): void;
 }
 
+export interface AppRuleEntry {
+  readonly match: string;
+  readonly muted: boolean;
+  readonly maxCount: number;
+  readonly expireSeconds: number;
+}
+
 export interface RuleSettings {
   readonly guardEnabled: boolean;
   readonly notifyEnabled: boolean;
@@ -43,6 +50,7 @@ export interface RuleSettings {
   readonly burstLimitEnabled: boolean;
   readonly burstWindowSeconds: number;
   readonly burstMaxPerSource: number;
+  readonly appRules: readonly AppRuleEntry[];
 }
 
 export interface NotificationHandle {

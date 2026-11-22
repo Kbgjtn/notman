@@ -2,6 +2,7 @@ import type { Scheduler } from "../src/scheduler.js";
 import type { SettingsStore } from "../src/settings.js";
 import type { Bridge } from "../src/shell-bridge.js";
 import {
+  type AppRuleEntry,
   type NotificationHandle,
   type RuleContext,
   type RuleSettings,
@@ -26,6 +27,7 @@ export interface MutableRuleSettings {
   burstLimitEnabled: boolean;
   burstWindowSeconds: number;
   burstMaxPerSource: number;
+  appRules: readonly AppRuleEntry[];
 }
 
 export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRuleSettings {
@@ -46,6 +48,7 @@ export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRule
     burstLimitEnabled: false,
     burstWindowSeconds: 10,
     burstMaxPerSource: 3,
+    appRules: [],
     ...overrides,
   };
 }

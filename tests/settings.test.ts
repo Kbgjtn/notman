@@ -55,6 +55,9 @@ describe("SettingsStore", () => {
       [SettingKey.BurstLimitEnabled]: true,
       [SettingKey.BurstWindowSeconds]: 15,
       [SettingKey.BurstMaxPerSource]: 2,
+      [SettingKey.AppRules]: JSON.stringify([
+        { match: "slack", muted: true, maxCount: 0, expireSeconds: 0 },
+      ]),
     });
     const store = new SettingsStore(settings as never);
 
@@ -75,6 +78,7 @@ describe("SettingsStore", () => {
       burstLimitEnabled: true,
       burstWindowSeconds: 15,
       burstMaxPerSource: 2,
+      appRules: [{ match: "slack", muted: true, maxCount: 0, expireSeconds: 0 }],
     };
     expect(store.read()).toEqual(expected);
   });
@@ -160,6 +164,7 @@ describe("SettingsStore", () => {
       burstLimitEnabled: false,
       burstWindowSeconds: 10,
       burstMaxPerSource: 3,
+      appRules: [],
     });
     expect(() => store.setGuardEnabled(false)).not.toThrow();
     expect(() => store.setNotifyEnabled(false)).not.toThrow();
