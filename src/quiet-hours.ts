@@ -44,7 +44,7 @@ export interface BannerController {
 /** Periodically toggles GNOME Do Not Disturb during the configured quiet window. */
 export class QuietHoursController {
   private _timerId: number | null = null;
-  private _activatedBySchedule = false;
+  private _activatedBySchedule: boolean;
 
   constructor(
     private readonly _readConfig: () => QuietHoursConfig,
@@ -54,7 +54,14 @@ export class QuietHoursController {
       const now = new Date();
       return now.getHours() * 60 + now.getMinutes();
     },
-  ) {}
+    initialActivated = false,
+  ) {
+    this._activatedBySchedule = initialActivated;
+  }
+
+  get isActivatedBySchedule(): boolean {
+    return this._activatedBySchedule;
+  }
 
   start(): void {
     this.sync();

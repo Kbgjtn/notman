@@ -98,8 +98,14 @@ export class FakeHandle implements NotificationHandle {
     this._compactBytes = bytes;
   }
 
+  compacting = false;
+
   isCompacted(): boolean {
     return this.compacted;
+  }
+
+  isCompacting(): boolean {
+    return this.compacting;
   }
 
   compact(): void {

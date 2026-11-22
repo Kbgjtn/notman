@@ -58,96 +58,101 @@ export class TrayIndicator {
     index: number,
   ) {
     this._indicator = new PanelMenu.Button(0.5, _("Notman")) as unknown as IndicatorButton;
-    this._icon = new St.Icon({
-      icon_name: "screenshot-recorded-symbolic",
-      style_class: "system-status-icon",
-    });
-    this._indicator.add_child(this._icon);
+    try {
+      this._icon = new St.Icon({
+        icon_name: "screenshot-recorded-symbolic",
+        style_class: "system-status-icon",
+      });
+      this._indicator.add_child(this._icon);
 
-    const menu = this._indicator.menu;
+      const menu = this._indicator.menu;
 
-    const statsCard = this.addStatsCard();
-    this._statsRow = statsCard.row;
-    this._activeValue = statsCard.activeValue;
-    this._cleanedValue = statsCard.cleanedValue;
-    this._savedValue = statsCard.savedValue;
+      const statsCard = this.addStatsCard();
+      this._statsRow = statsCard.row;
+      this._activeValue = statsCard.activeValue;
+      this._cleanedValue = statsCard.cleanedValue;
+      this._savedValue = statsCard.savedValue;
 
-    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+      menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-    this.addSwitch(
-      _("Enabled"),
-      SettingKey.GuardEnabled,
-      () => this._settings.get_boolean(SettingKey.GuardEnabled),
-      (value) => this._settings.set_boolean(SettingKey.GuardEnabled, value),
-    );
-    this.addSwitch(
-      _("Quiet hours"),
-      SettingKey.QuietHoursEnabled,
-      () => this._settings.get_boolean(SettingKey.QuietHoursEnabled),
-      (value) => this._settings.set_boolean(SettingKey.QuietHoursEnabled, value),
-    );
-    this._notifyItem = this.addSwitch(
-      _("Screenshots"),
-      SettingKey.ScreenshotNotifyEnabled,
-      () => this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled),
-      (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
-    );
-    this._modeRow = this.addPreviewModeBar();
+      this.addSwitch(
+        _("Enabled"),
+        SettingKey.GuardEnabled,
+        () => this._settings.get_boolean(SettingKey.GuardEnabled),
+        (value) => this._settings.set_boolean(SettingKey.GuardEnabled, value),
+      );
+      this.addSwitch(
+        _("Quiet hours"),
+        SettingKey.QuietHoursEnabled,
+        () => this._settings.get_boolean(SettingKey.QuietHoursEnabled),
+        (value) => this._settings.set_boolean(SettingKey.QuietHoursEnabled, value),
+      );
+      this._notifyItem = this.addSwitch(
+        _("Screenshots"),
+        SettingKey.ScreenshotNotifyEnabled,
+        () => this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled),
+        (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
+      );
+      this._modeRow = this.addPreviewModeBar();
 
-    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+      menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-    const prefsItem = new PopupMenu.PopupMenuItem(_("Settings"));
-    prefsItem.connect("activate", () => {
-      try {
-        openPreferences();
-      } catch (e) {
-        log.err("tray", "could not open preferences", e);
-      }
-    });
-    menu.addMenuItem(prefsItem);
-
-    const syncVisualState = (): void => {
-      const guardEnabled = this._settings.get_boolean(SettingKey.GuardEnabled);
-      const notifyEnabled = this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled);
-      const modeActive = guardEnabled && notifyEnabled;
-      this._icon.opacity = guardEnabled ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
-      this._notifyItem.setSensitive(guardEnabled);
-      this._modeRow.opacity = modeActive ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
-      for (const button of this._modeButtons) {
-        button.reactive = modeActive;
-        button.can_focus = modeActive;
-      }
-      this.refreshStatus();
-    };
-    this.watchSetting(SettingKey.GuardEnabled, syncVisualState);
-    this.watchSetting(SettingKey.ScreenshotNotifyEnabled, syncVisualState);
-    syncVisualState();
-
-    const openId = menu.connect("open-state-changed", (...args: unknown[]) => {
-      if (this._disposed) return;
-      try {
-        prefsItem.active = false;
-        for (const button of this._modeButtons) button.hover = false;
-        if (args[1]) {
-          this.refreshAll();
-          this.startStatsTimer();
-        } else {
-          this.stopStatsTimer();
+      const prefsItem = new PopupMenu.PopupMenuItem(_("Settings"));
+      prefsItem.connect("activate", () => {
+        try {
+          openPreferences();
+        } catch (e) {
+          log.err("tray", "could not open preferences", e);
         }
-      } catch (e) {
-        log.err("tray", "menu state handler failed", e);
-      }
-    });
-    this._disposers.push(() => {
-      try {
-        menu.disconnect(openId);
-      } catch {
-        // Menu may already be gone.
-      }
-    });
+      });
+      menu.addMenuItem(prefsItem);
 
-    Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
-    log.info("tray", "status indicator added");
+      const syncVisualState = (): void => {
+        const guardEnabled = this._settings.get_boolean(SettingKey.GuardEnabled);
+        const notifyEnabled = this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled);
+        const modeActive = guardEnabled && notifyEnabled;
+        this._icon.opacity = guardEnabled ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
+        this._notifyItem.setSensitive(guardEnabled);
+        this._modeRow.opacity = modeActive ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
+        for (const button of this._modeButtons) {
+          button.reactive = modeActive;
+          button.can_focus = modeActive;
+        }
+        this.refreshStatus();
+      };
+      this.watchSetting(SettingKey.GuardEnabled, syncVisualState);
+      this.watchSetting(SettingKey.ScreenshotNotifyEnabled, syncVisualState);
+      syncVisualState();
+
+      const openId = menu.connect("open-state-changed", (...args: unknown[]) => {
+        if (this._disposed) return;
+        try {
+          prefsItem.active = false;
+          for (const button of this._modeButtons) button.hover = false;
+          if (args[1]) {
+            this.refreshAll();
+            this.startStatsTimer();
+          } else {
+            this.stopStatsTimer();
+          }
+        } catch (e) {
+          log.err("tray", "menu state handler failed", e);
+        }
+      });
+      this._disposers.push(() => {
+        try {
+          menu.disconnect(openId);
+        } catch {
+          // Menu may already be gone.
+        }
+      });
+
+      Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
+      log.info("tray", "status indicator added");
+    } catch (e) {
+      this.destroy();
+      throw e;
+    }
   }
 
   static create(

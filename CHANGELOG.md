@@ -16,4 +16,4 @@ All notable changes to Notman are documented in this file.
 - **Import / Export settings**: save and restore Notman configuration as JSON from Preferences.
 - **GNOME Shell 46, 47, and 48 support**: modular compatibility adapters including GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` handling.
 - **Native UI**: tabbed libadwaita Preferences (`General`, `Captures`, `Limits`, `About`), top-bar quick menu with live adaptive-unit stats and configurable panel position/order, plus D-Bus inspection API.
-- **Verification**: 105 unit tests, isolated Xvfb GNOME Shell smoke test, bounded benchmark harness, and GNOME 46/47/48 CI compatibility matrix.
+- **Verification**: 110 unit tests, isolated Xvfb GNOME Shell smoke test, bounded benchmark harness, and GNOME 46/47/48 CI compatibility matrix.

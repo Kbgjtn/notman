@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  parseAppRules,
   parseIndicatorPosition,
   parseThumbnailMode,
   SettingKey,
@@ -211,5 +212,20 @@ describe("SettingsStore", () => {
     expect(parseIndicatorPosition(IndicatorPosition.Center)).toBe(IndicatorPosition.Center);
     expect(parseIndicatorPosition(IndicatorPosition.Right)).toBe(IndicatorPosition.Right);
     expect(parseIndicatorPosition("unexpected")).toBe(IndicatorPosition.Right);
+  });
+
+  it("parses app rules strictly without coercing string 'false' to true", () => {
+    const raw = JSON.stringify([
+      { match: "  slack  ", muted: "false", maxCount: 250, expireSeconds: -10 },
+      { match: "discord", muted: true, maxCount: 2, expireSeconds: 99999 },
+      { match: "   ", muted: true },
+      null,
+    ]);
+    expect(parseAppRules(raw)).toEqual([
+      { match: "slack", muted: false, maxCount: 100, expireSeconds: 0 },
+      { match: "discord", muted: true, maxCount: 2, expireSeconds: 3600 },
+    ]);
+    expect(parseAppRules("not-json")).toEqual([]);
+    expect(parseAppRules("{}")).toEqual([]);
   });
 });

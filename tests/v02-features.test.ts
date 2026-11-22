@@ -258,11 +258,30 @@ describe("QuietHoursController", () => {
     controller.sync();
     expect(showBanners).toBe(true);
 
-    // Re-enter quiet hours, then simulate screen lock disable (restore=false).
+    // Re-enter quiet hours, then simulate screen lock disable (restore=false) and unlock handoff.
     start = "22:00";
     controller.sync();
     expect(showBanners).toBe(false);
+    const preserved = controller.isActivatedBySchedule;
+    expect(preserved).toBe(true);
     controller.stop(false);
     expect(showBanners).toBe(false);
+
+    // Unlocking after quiet hours ended restores DND immediately via preserved state.
+    const afterUnlock = new QuietHoursController(
+      () => ({ enabled: true, start: "22:00", end: "08:00" }),
+      {
+        getShowBanners: () => showBanners,
+        setShowBanners: (v) => {
+          showBanners = v;
+        },
+      },
+      new FakeScheduler(),
+      () => 9 * 60,
+      preserved,
+    );
+    afterUnlock.start();
+    expect(showBanners).toBe(true);
+    afterUnlock.stop();
   });
 });

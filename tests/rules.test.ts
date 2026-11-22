@@ -200,6 +200,28 @@ describe("ScreenshotRule", () => {
     expect(outcome.destroy).toEqual([]);
   });
 
+  it("skips 0-byte handles when trimming over memory budget", () => {
+    const zeroOlder = new FakeHandle(1, SourceKey.Screenshot, 10, 0);
+    const heavy1 = new FakeHandle(2, SourceKey.Screenshot, 20, 800 * 1024);
+    const heavy2 = new FakeHandle(3, SourceKey.Screenshot, 30, 800 * 1024);
+    const outcome = rule.evaluate(
+      [zeroOlder, heavy1, heavy2],
+      makeContext(makeSettings({ memoryBudgetMb: 1 })),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([2]);
+  });
+
+  it("does not destroy or re-compact handles whose async compaction is still in-flight", () => {
+    const inFlight = new FakeHandle(1, SourceKey.Screenshot, 10, 32 * MiB);
+    inFlight.compacting = true;
+    const outcome = rule.evaluate(
+      [inFlight],
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact, memoryBudgetMb: 4 })),
+    );
+    expect(outcome.destroy).toEqual([]);
+    expect(outcome.compact).toEqual([]);
+  });
+
   it("does not return the same handle twice when rules overlap", () => {
     const old = new FakeHandle(1, SourceKey.Screenshot, 1000, MiB);
     const fresh = new FakeHandle(2, SourceKey.Screenshot, 19_000, MiB);

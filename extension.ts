@@ -17,6 +17,7 @@ import { TrayIndicator } from "./src/ui/tray.js";
 export default class NotmanExtension extends Extension {
   private _engine: Engine | null = null;
   private _disposables: Disposables | null = null;
+  private _quietHoursActivatedBySchedule = false;
 
   enable(): void {
     if (this._engine || this._disposables) this.disable();
@@ -95,6 +96,8 @@ export default class NotmanExtension extends Extension {
             setShowBanners: (show) => desktopNotifications.set_boolean("show-banners", show),
           },
           scheduler,
+          undefined,
+          this._quietHoursActivatedBySchedule,
         );
         const quietIds: number[] = [];
         disposables.add(() => {
@@ -108,6 +111,9 @@ export default class NotmanExtension extends Extension {
           const isScreenLocked = Boolean(
             (Main as unknown as { sessionMode?: { isLocked?: boolean } }).sessionMode?.isLocked,
           );
+          this._quietHoursActivatedBySchedule = isScreenLocked
+            ? quietHours.isActivatedBySchedule
+            : false;
           quietHours.stop(!isScreenLocked);
         });
         quietHours.start();

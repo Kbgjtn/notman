@@ -815,6 +815,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         const expander = new Adw.ExpanderRow({
           title: entry.match,
           subtitle: formatRuleSummary(entry),
+          use_markup: false,
         });
 
         const muteRow = new Adw.SwitchRow({

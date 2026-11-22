@@ -637,4 +637,66 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(1);
     expect(engine.getStats().prunedCount).toBe(2);
   });
+
+  it("reconciles savedBytes when a compacted notification is dismissed before the next sweep", () => {
+    const handle = new FakeHandle(
+      1,
+      SourceKey.Screenshot,
+      1000,
+      4 * 1024 * 1024,
+      false,
+      false,
+      true,
+      false,
+      40_960,
+    );
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ thumbnailMode: ThumbnailMode.Full })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(notification);
+    // Simulate async compaction completing between sweeps, then user dismisses immediately.
+    handle.compact();
+    engine.onNotificationDestroyed(notification);
+
+    expect(engine.getStats().activeCount).toBe(0);
+    expect(engine.getStats().savedBytes).toBe(4 * 1024 * 1024 - 40_960);
+  });
+
+  it("handles synchronous re-entrant destroy without leaking pending IDs", () => {
+    const notification = {};
+    let engineRef: Engine | null = null;
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 1000, 1024);
+    const origDestroy = handle.destroy.bind(handle);
+    handle.destroy = (): boolean => {
+      const ok = origDestroy();
+      engineRef?.onNotificationDestroyed(notification);
+      return ok;
+    };
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ notifyEnabled: false })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+    engineRef = engine;
+
+    engine.onNotificationAdded(notification);
+    expect(handle.destroyCalls).toBe(1);
+    expect(engine.getStats().prunedCount).toBe(1);
+
+    // Re-adding the same ID after synchronous teardown must still be destroyable (not stuck in _pending).
+    handle.destroyed = false;
+    engine.onNotificationAdded(notification);
+    expect(handle.destroyCalls).toBe(2);
+    expect(engine.getStats().prunedCount).toBe(2);
+  });
 });
