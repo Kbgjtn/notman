@@ -186,19 +186,15 @@ export class TrayIndicator {
     const box = new St.BoxLayout({
       x_expand: true,
       x_align: Clutter.ActorAlign.FILL,
-      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 6 }),
+      style_class: "notman-segmented",
+      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 0 }),
     });
-    const choices: Array<{ mode: ThumbnailMode; label: string; button: St.Button }> = [
-      { mode: ThumbnailMode.Full, label: _("Full"), button: this.makeModeButton(_("Full")) },
-      {
-        mode: ThumbnailMode.Compact,
-        label: _("Compact"),
-        button: this.makeModeButton(_("Compact")),
-      },
+    const choices: Array<{ mode: ThumbnailMode; button: St.Button }> = [
+      { mode: ThumbnailMode.Full, button: this.makeModeButton(_("Full"), "notman-seg-btn-first") },
+      { mode: ThumbnailMode.Compact, button: this.makeModeButton(_("Compact")) },
       {
         mode: ThumbnailMode.TextOnly,
-        label: _("Text"),
-        button: this.makeModeButton(_("Text")),
+        button: this.makeModeButton(_("Text"), "notman-seg-btn-last"),
       },
     ];
 
@@ -230,14 +226,13 @@ export class TrayIndicator {
     return row;
   }
 
-  private makeModeButton(label: string): St.Button {
+  private makeModeButton(label: string, extraClass?: string): St.Button {
     return new St.Button({
       label,
       toggle_mode: true,
       can_focus: true,
       x_expand: true,
-      style_class: "button",
-      style: "padding: 4px 10px;",
+      style_class: extraClass ? `notman-seg-btn ${extraClass}` : "notman-seg-btn",
     });
   }
 

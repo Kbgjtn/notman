@@ -3,7 +3,7 @@ EXT_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SCHEMA := schemas/org.gnome.shell.extensions.notman.gschema.xml
 STAMP := node_modules/.package-lock.json
 
-TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json $(shell find src -name '*.ts' -print)
+TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json stylesheet.css $(shell find src -name '*.ts' -print)
 
 CASE ?= leak
 RES ?=
@@ -36,7 +36,7 @@ dist/extension.js dist/prefs.js &: $(STAMP) $(TS_SOURCES)
 	mkdir -p dist.new
 	cp dist/extension.js dist/prefs.js dist.new/
 	cp -R dist/src dist.new/ 2>/dev/null || true
-	cp metadata.json dist.new/
+	cp metadata.json stylesheet.css dist.new/
 	cp -R schemas dist.new/
 	glib-compile-schemas --strict dist.new/schemas
 	@if [ -d dist ]; then mv dist dist.old; fi
