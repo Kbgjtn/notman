@@ -275,7 +275,12 @@ export default class NotmanPreferences extends ExtensionPreferences {
     };
     const activeVal = makeStatTile(_("Active"), "go-up-symbolic", "notman-stat-active");
     const cleanedVal = makeStatTile(_("Cleaned"), "go-down-symbolic", "notman-stat-cleaned");
-    const savedVal = makeStatTile(_("RAM saved"), "emblem-ok-symbolic", "notman-stat-saved", true);
+    const savedVal = makeStatTile(
+      _("Memory saved"),
+      "emblem-ok-symbolic",
+      "notman-stat-saved",
+      true,
+    );
     statusGroup.add(statsGrid);
     generalPage.add(statusGroup);
 

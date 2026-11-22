@@ -116,6 +116,8 @@ export class TrayIndicator {
     const openId = menu.connect("open-state-changed", (...args: unknown[]) => {
       if (this._disposed) return;
       try {
+        prefsItem.active = false;
+        for (const button of this._modeButtons) button.hover = false;
         if (args[1]) {
           this.refreshAll();
           this.startStatsTimer();
@@ -238,6 +240,7 @@ export class TrayIndicator {
     return new St.Button({
       label,
       toggle_mode: true,
+      track_hover: true,
       can_focus: true,
       x_expand: true,
       style_class: extraClass ? `notman-seg-btn ${extraClass}` : "notman-seg-btn",
