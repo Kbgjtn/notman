@@ -413,19 +413,19 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }> = [
       {
         mode: ThumbnailMode.Full,
-        icon: "camera-photo-symbolic",
+        icon: "image-x-generic-symbolic",
         title: _("Full size"),
         subtitle: _("Original image (~32 MiB at 4K)"),
       },
       {
         mode: ThumbnailMode.Compact,
-        icon: "view-grid-symbolic",
+        icon: "view-restore-symbolic",
         title: _("Compact"),
         subtitle: _("Small preview (~36 KB)"),
       },
       {
         mode: ThumbnailMode.TextOnly,
-        icon: "text-x-generic-symbolic",
+        icon: "format-text-plaintext-symbolic",
         title: _("Text only"),
         subtitle: _("No image preview"),
       },
