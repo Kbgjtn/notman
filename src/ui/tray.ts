@@ -67,11 +67,25 @@ export class TrayIndicator {
 
     const menu = this._indicator.menu;
 
+    const statsCard = this.addStatsCard();
+    this._statsRow = statsCard.row;
+    this._activeValue = statsCard.activeValue;
+    this._cleanedValue = statsCard.cleanedValue;
+    this._savedValue = statsCard.savedValue;
+
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
     this.addSwitch(
       _("Enabled"),
       SettingKey.GuardEnabled,
       () => this._settings.get_boolean(SettingKey.GuardEnabled),
       (value) => this._settings.set_boolean(SettingKey.GuardEnabled, value),
+    );
+    this.addSwitch(
+      _("Quiet hours"),
+      SettingKey.QuietHoursEnabled,
+      () => this._settings.get_boolean(SettingKey.QuietHoursEnabled),
+      (value) => this._settings.set_boolean(SettingKey.QuietHoursEnabled, value),
     );
     this._notifyItem = this.addSwitch(
       _("Screenshots"),
@@ -80,19 +94,6 @@ export class TrayIndicator {
       (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
     );
     this._modeRow = this.addPreviewModeBar();
-
-    this.addSwitch(
-      _("Quiet hours"),
-      SettingKey.QuietHoursEnabled,
-      () => this._settings.get_boolean(SettingKey.QuietHoursEnabled),
-      (value) => this._settings.set_boolean(SettingKey.QuietHoursEnabled, value),
-    );
-
-    const statsCard = this.addStatsCard();
-    this._statsRow = statsCard.row;
-    this._activeValue = statsCard.activeValue;
-    this._cleanedValue = statsCard.cleanedValue;
-    this._savedValue = statsCard.savedValue;
 
     menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
