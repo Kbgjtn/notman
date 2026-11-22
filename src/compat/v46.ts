@@ -1,4 +1,5 @@
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
 import type { AdapterCapabilities, ShellAdapter } from "./adapter.js";
 
@@ -8,6 +9,29 @@ const SCREENSHOT_ICON = "screenshot-recorded-symbolic";
 export class V46Adapter implements ShellAdapter {
   readonly id = "v46";
   readonly version = "46";
+  readonly signals = {
+    sourceAdded: "source-added",
+    notificationAdded: "notification-added",
+    destroy: "destroy",
+  };
+
+  criticalUrgency(): number {
+    return MessageTray.Urgency.CRITICAL;
+  }
+
+  dismissedReason(): number {
+    return MessageTray.NotificationDestroyedReason.DISMISSED;
+  }
+
+  getActiveNotifications(): unknown[] {
+    const tray = Main.messageTray as unknown as {
+      _notification?: unknown;
+      _notificationQueue?: unknown[];
+    } | null;
+    const active = [...(tray?._notificationQueue ?? [])];
+    if (tray?._notification) active.push(tray._notification);
+    return active;
+  }
 
   probe(): AdapterCapabilities {
     const tray = Main.messageTray as unknown as {

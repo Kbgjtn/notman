@@ -9,8 +9,16 @@ export interface AdapterCapabilities {
 export interface ShellAdapter {
   readonly id: string;
   readonly version: string;
+  readonly signals: {
+    sourceAdded: string;
+    notificationAdded: string;
+    destroy: string;
+  };
   probe(): AdapterCapabilities;
   isScreenshotSource(source: unknown): boolean;
+  criticalUrgency(): number;
+  dismissedReason(): number;
+  getActiveNotifications(): unknown[];
 }
 
 /**
