@@ -112,8 +112,10 @@ Major-only entries (e.g. `"46"`) cover patch releases.
 60-second timeout and records gnome-shell RSS per shot in `results/baseline.csv`.
 
 `tools/benchmark.sh` repeats that for a named case and screen resolution,
-sampling both RSS and the extension's D-Bus statistics. It restores settings and
-the display mode on exit. Cases are `leak` (reference, guard off),
+sampling both RSS and the extension's D-Bus statistics. Screenshot saving is
+disabled for the duration of a run, so your Pictures directory is not touched;
+the shell still creates the notification and its full-size thumbnail. All
+settings and the display mode are restored on exit. Cases are `leak` (reference, guard off),
 `leak-dndoff` (control), `drop`, `text`, `limit`, `expire`, `budget` and `cap`.
 The DND-off case is a control only: banners add compositor noise and the
 three-entry banner queue still leaks the overflow, so it is not the comparison

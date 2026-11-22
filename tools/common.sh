@@ -3,6 +3,19 @@
 set -uo pipefail
 
 NT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$NT_DIR/.." && pwd)"
+
+# The extension schema is not installed system-wide; point GSettings at the
+# compiled copy in the repo so case settings can actually be applied.
+if [ -f "$ROOT_DIR/dist/schemas/gschemas.compiled" ]; then
+  export GSETTINGS_SCHEMA_DIR="$ROOT_DIR/dist/schemas"
+else
+  if [ ! -f "$ROOT_DIR/schemas/gschemas.compiled" ]; then
+    glib-compile-schemas "$ROOT_DIR/schemas"
+  fi
+  export GSETTINGS_SCHEMA_DIR="$ROOT_DIR/schemas"
+fi
+
 SHELL_PID="$(pgrep -u "$(id -u)" -x gnome-shell | head -1 || true)"
 
 if [ -z "$SHELL_PID" ]; then
@@ -16,6 +29,8 @@ NT_OUTPUT=""
 
 NT_SETTINGS_SCHEMA="org.gnome.shell.extensions.notman"
 NT_DESKTOP_SCHEMA="org.gnome.desktop.notifications"
+NT_LOCKDOWN_SCHEMA="org.gnome.desktop.lockdown"
+NT_ORIG_LOCKDOWN=""
 NT_SETTINGS_KEYS=(
   "guard-enabled"
   "screenshot-notify-enabled"
@@ -30,16 +45,13 @@ rss_kb() {
   awk '/^VmRSS:/ {print $2}' "/proc/$SHELL_PID/status"
 }
 
-shot_count() {
-  find "$HOME/Pictures/Screenshots" -maxdepth 1 -type f -name '*.png' 2>/dev/null | wc -l
-}
-
 save_gsettings() {
   local key
   for key in "${NT_SETTINGS_KEYS[@]}"; do
     NT_ORIG_SETTINGS["$key"]="$(gsettings get "$NT_SETTINGS_SCHEMA" "$key")"
   done
   NT_ORIG_SETTINGS["show-banners"]="$(gsettings get "$NT_DESKTOP_SCHEMA" show-banners)"
+  NT_ORIG_LOCKDOWN="$(gsettings get "$NT_LOCKDOWN_SCHEMA" disable-save-to-disk)"
 }
 
 restore_gsettings() {
@@ -52,10 +64,17 @@ restore_gsettings() {
   if [ -n "${NT_ORIG_SETTINGS[show-banners]:-}" ]; then
     gsettings set "$NT_DESKTOP_SCHEMA" show-banners "${NT_ORIG_SETTINGS[show-banners]}" 2>/dev/null || true
   fi
+  if [ -n "$NT_ORIG_LOCKDOWN" ]; then
+    gsettings set "$NT_LOCKDOWN_SCHEMA" disable-save-to-disk "$NT_ORIG_LOCKDOWN" 2>/dev/null || true
+  fi
 }
 
 set_case_settings() {
   local case="$1"
+  # Never write screenshots into the user's Pictures directory. The shell still
+  # creates the full-size thumbnail notification on this path.
+  gsettings set "$NT_LOCKDOWN_SCHEMA" disable-save-to-disk true
+
   # Do Not Disturb on is the reported condition; only the control case turns it off.
   gsettings set "$NT_DESKTOP_SCHEMA" show-banners false
   case "$case" in

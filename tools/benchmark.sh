@@ -70,30 +70,30 @@ for ((run = 1; run <= RUNS; run++)); do
     echo "# case=$CASE res=${RES:-native} run=$run"
     echo "# shell_pid=$SHELL_PID pin=$PIN_CPU timeout=$TIMEOUT_S"
     echo "# dnd_show_banners=$(gsettings get org.gnome.desktop.notifications show-banners)"
+    echo "# save_to_disk=false"
     printf '# settings='
     for key in "${NT_SETTINGS_KEYS[@]}"; do
       printf '%s=%s ' "$key" "$(gsettings get "$NT_SETTINGS_SCHEMA" "$key")"
     done
     echo
-    echo "shot,rss_kb,delta_kb,shot_files,active_count,estimated_bytes,pruned_count,shell_rss_bytes"
+    echo "shot,rss_kb,delta_kb,active_count,estimated_bytes,pruned_count,shell_rss_bytes"
   } > "$OUT"
 
   BASE_RSS="$(rss_kb)"
-  BASE_FILES="$(shot_count)"
-  echo "run $run: baseline rss=${BASE_RSS} kB, files=${BASE_FILES}"
+  echo "run $run: baseline rss=${BASE_RSS} kB"
 
   for ((shot = 1; shot <= SHOTS; shot++)); do
     xdotool key --clearmodifiers shift+Print
     sleep "$SLEEP"
     RSS="$(rss_kb)"
     STATS="$(read_stats)"
-    printf '%s,%s,%s,%s,%s\n' "$shot" "$RSS" "$((RSS - BASE_RSS))" "$(shot_count)" "$STATS" >> "$OUT"
+    printf '%s,%s,%s,%s\n' "$shot" "$RSS" "$((RSS - BASE_RSS))" "$STATS" >> "$OUT"
   done
 
   if [ "$CASE" = "expire" ]; then
     sleep "$EXPIRE_PAUSE"
-    printf 'after_pause,%s,%s,%s,%s\n' \
-      "$(rss_kb)" "$(( $(rss_kb) - BASE_RSS ))" "$(shot_count)" "$(read_stats)" >> "$OUT"
+    printf 'after_pause,%s,%s,%s\n' \
+      "$(rss_kb)" "$(( $(rss_kb) - BASE_RSS ))" "$(read_stats)" >> "$OUT"
   fi
 
   echo "run $run -> $OUT"

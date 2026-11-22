@@ -6,6 +6,8 @@
 # full-resolution thumbnail notification. D-Bus org.gnome.Shell.Screenshot does
 # NOT create this notification, so xdotool is required here.
 #
+# Screenshot files are disabled for the duration of the run via the GNOME
+# lockdown key, so the user's Pictures directory is never touched.
 # Bounded by design: one pinned CPU, a hard timeout, and a small N.
 set -euo pipefail
 
@@ -14,7 +16,7 @@ PIN_CPU="${PIN_CPU:-2}"
 TIMEOUT_S="${TIMEOUT_S:-60}"
 SLEEP="${SLEEP:-0.4}"
 OUT="${OUT:-results/baseline.csv}"
-SHOT_DIR="${SHOT_DIR:-$HOME/Pictures/Screenshots}"
+LOCKDOWN_SCHEMA="org.gnome.desktop.lockdown"
 
 # Re-exec once under the pin + timeout so every child inherits both.
 if [ -z "${_NT_PINNED:-}" ]; then
@@ -28,8 +30,14 @@ if [ -z "$PID" ]; then
   exit 1
 fi
 
+ORIG_LOCKDOWN="$(gsettings get "$LOCKDOWN_SCHEMA" disable-save-to-disk)"
+cleanup() {
+  gsettings set "$LOCKDOWN_SCHEMA" disable-save-to-disk "$ORIG_LOCKDOWN" 2>/dev/null || true
+}
+trap cleanup EXIT
+gsettings set "$LOCKDOWN_SCHEMA" disable-save-to-disk true
+
 rss_kb() { awk '/^VmRSS:/ {print $2}' "/proc/$PID/status"; }
-shot_count() { find "$SHOT_DIR" -maxdepth 1 -type f -name '*.png' 2>/dev/null | wc -l; }
 
 mkdir -p "$(dirname "$OUT")"
 {
@@ -37,18 +45,18 @@ mkdir -p "$(dirname "$OUT")"
   echo "# shell_pid=$PID n=$N pin_cpu=$PIN_CPU timeout_s=$TIMEOUT_S sleep=$SLEEP"
   echo "# keybinding=$(gsettings get org.gnome.shell.keybindings screenshot)"
   echo "# dnd_show_banners=$(gsettings get org.gnome.desktop.notifications show-banners)"
-  echo "shot,rss_kb,delta_kb,shot_files"
+  echo "# save_to_disk=false"
+  echo "shot,rss_kb,delta_kb"
 } > "$OUT"
 
 BASE_RSS="$(rss_kb)"
-BASE_FILES="$(shot_count)"
-echo "baseline rss=${BASE_RSS} kB, existing screenshots=${BASE_FILES}"
+echo "baseline rss=${BASE_RSS} kB"
 
 for ((i = 1; i <= N; i++)); do
   xdotool key --clearmodifiers shift+Print
   sleep "$SLEEP"
   RSS="$(rss_kb)"
-  printf '%s,%s,%s,%s\n' "$i" "$RSS" "$((RSS - BASE_RSS))" "$(shot_count)" >> "$OUT"
+  printf '%s,%s,%s\n' "$i" "$RSS" "$((RSS - BASE_RSS))" >> "$OUT"
 done
 
 echo "done. results -> $OUT"

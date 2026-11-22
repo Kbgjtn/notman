@@ -10,7 +10,6 @@ HEADER = (
     "shot",
     "rss_kb",
     "delta_kb",
-    "shot_files",
     "active_count",
     "estimated_bytes",
     "pruned_count",
