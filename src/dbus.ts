@@ -4,6 +4,7 @@ import GLib from "gi://GLib";
 import type { Disposables } from "./disposables.js";
 import type { Engine } from "./engine.js";
 import { log } from "./log.js";
+import { clampInt } from "./ui/mappings.js";
 
 const BUS_NAME = "org.gnome.Shell.Extensions.Notman";
 const OBJECT_PATH = "/org/gnome/Shell/Extensions/Notman";
@@ -93,7 +94,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
                   }
                   case "SetMaxCount": {
                     const [count] = params.deepUnpack() as [number];
-                    engine.setMaxCount(count);
+                    engine.setMaxCount(clampInt(count, 0, 100, 3));
                     invocation.return_value(null);
                     break;
                   }

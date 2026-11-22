@@ -40,6 +40,9 @@ NOTMAN_SETTINGS_KEYS=(
   "screenshot-expire-seconds"
   "screenshot-memory-budget-mb"
   "emergency-hard-cap"
+  "show-stats"
+  "clear-on-panel-open"
+  "debug-logging"
 )
 
 rss_kb() {

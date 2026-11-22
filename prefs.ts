@@ -1,10 +1,12 @@
 import Adw from "gi://Adw";
 import Gio from "gi://Gio";
+import type GLib from "gi://GLib";
 import Gtk from "gi://Gtk";
 import {
   gettext as _,
   ExtensionPreferences,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
+import { MiB } from "./src/ui/mappings.js";
 
 function addSwitch(
   group: Adw.PreferencesGroup,
@@ -39,10 +41,66 @@ function addSpin(
   group.add(row);
 }
 
+function readStats(): Record<string, string | number> | null {
+  try {
+    const proxy = new Gio.DBusProxy({
+      g_connection: Gio.DBus.session,
+      g_interface_name: "org.gnome.Shell.Extensions.Notman",
+      g_name: "org.gnome.Shell.Extensions.Notman",
+      g_object_path: "/org/gnome/Shell/Extensions/Notman",
+    });
+    const reply = proxy.call_sync("GetStats", null, Gio.DBusCallFlags.NONE, 2000, null);
+    const [dict] = reply.deepUnpack() as [Record<string, GLib.Variant>];
+    return {
+      activeCount: dict.activeCount.get_int32(),
+      estimatedBytes: Number(dict.estimatedBytes.get_int64()),
+      peakBytes: Number(dict.peakBytes.get_int64()),
+      prunedCount: dict.prunedCount.get_int32(),
+      shellRssBytes: Number(dict.shellRssBytes.get_int64()),
+      adapterId: dict.adapterId.deepUnpack() as string,
+      tier: dict.tier.get_int32(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default class NotmanPreferences extends ExtensionPreferences {
-  fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {
+  fillPreferencesWindow(window: Adw.PreferencesWindow): void {
     const settings = this.getSettings();
     const page = new Adw.PreferencesPage({ title: _("Notman") });
+
+    const status = new Adw.PreferencesGroup({
+      title: _("Status"),
+      description: _("Live information from the running extension."),
+    });
+    const keptRow = new Adw.ActionRow({ title: _("Kept notifications") });
+    const memoryRow = new Adw.ActionRow({ title: _("Thumbnail memory / peak") });
+    const shellRow = new Adw.ActionRow({ title: _("Shell memory") });
+    const prunedRow = new Adw.ActionRow({ title: _("Pruned") });
+    const adapterRow = new Adw.ActionRow({ title: _("Adapter / tier") });
+    for (const row of [keptRow, memoryRow, shellRow, prunedRow, adapterRow]) status.add(row);
+    page.add(status);
+
+    const refreshStatus = (): void => {
+      const stats = readStats();
+      if (!stats) {
+        keptRow.subtitle = _("Unavailable");
+        memoryRow.subtitle = "—";
+        shellRow.subtitle = "—";
+        prunedRow.subtitle = "—";
+        adapterRow.subtitle = "—";
+        return;
+      }
+      keptRow.subtitle = String(stats.activeCount);
+      memoryRow.subtitle =
+        `${(Number(stats.estimatedBytes) / MiB).toFixed(1)} / ` +
+        `${(Number(stats.peakBytes) / MiB).toFixed(1)} MiB`;
+      shellRow.subtitle = `${(Number(stats.shellRssBytes) / MiB).toFixed(0)} MiB`;
+      prunedRow.subtitle = String(stats.prunedCount);
+      adapterRow.subtitle = `${stats.adapterId} / ${stats.tier}`;
+    };
+    refreshStatus();
 
     const guard = new Adw.PreferencesGroup({
       title: _("Guard"),
@@ -83,6 +141,11 @@ export default class NotmanPreferences extends ExtensionPreferences {
         modeRow.selected === 1 ? "text-only" : "full",
       );
     });
+    const modeChangedId = settings.connect("changed::screenshot-thumbnail-mode", () => {
+      const selected = settings.get_string("screenshot-thumbnail-mode") === "text-only" ? 1 : 0;
+      if (modeRow.selected !== selected) modeRow.selected = selected;
+    });
+    window.connect("close-request", () => settings.disconnect(modeChangedId));
     rules.add(modeRow);
     addSpin(
       rules,
@@ -159,6 +222,5 @@ export default class NotmanPreferences extends ExtensionPreferences {
     page.add(diagnostics);
 
     window.add(page);
-    return Promise.resolve();
   }
 }

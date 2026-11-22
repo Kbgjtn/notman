@@ -36,7 +36,7 @@
 
     <key name="screenshot-max-count" type="i">
       <default>3</default>
-      <range min="0" max="1000"/>
+      <range min="0" max="100"/>
       <summary>Maximum retained screenshot notifications</summary>
       <description>
         Oldest screenshot notifications are destroyed beyond this count.
@@ -46,7 +46,7 @@
 
     <key name="screenshot-expire-seconds" type="i">
       <default>15</default>
-      <range min="0" max="86400"/>
+      <range min="0" max="300"/>
       <summary>Screenshot notification expiry</summary>
       <description>
         Seconds before a screenshot notification is destroyed. Zero disables
@@ -56,7 +56,7 @@
 
     <key name="screenshot-memory-budget-mb" type="i">
       <default>64</default>
-      <range min="0" max="4096"/>
+      <range min="0" max="512"/>
       <summary>Estimated screenshot thumbnail memory budget</summary>
       <description>
         Prunes oldest screenshot notifications when the estimated texture
@@ -66,7 +66,7 @@
 
     <key name="emergency-hard-cap" type="i">
       <default>64</default>
-      <range min="0" max="10000"/>
+      <range min="0" max="256"/>
       <summary>Emergency hard cap on tracked notifications</summary>
       <description>
         Last-resort bound so the guard cannot be disarmed into causing the very

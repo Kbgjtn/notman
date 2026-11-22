@@ -60,8 +60,8 @@ export class Engine {
     const handle = this._bridge.makeHandle(notification, sourceKey);
     if (!handle) return;
     this._handles.set(handle.id, handle);
-    // Immediate pass: notifyEnabled=false and text-only apply without waiting
-    // for the next sweep, so the full-size texture is never retained.
+    // Immediate pass so notifyEnabled=false schedules destruction and text-only
+    // swaps the full-size icon without waiting for the next sweep.
     if (!deferSweep) this.sweep();
   }
 

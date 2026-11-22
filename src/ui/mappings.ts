@@ -25,10 +25,11 @@ export function clampInt(value: number, min: number, max: number, fallback: numb
   return Math.min(max, Math.max(min, Math.round(value)));
 }
 
-const MiB = 1024 * 1024;
+export const MiB = 1024 * 1024;
 
 export function formatStats(stats: StatsSnapshot): string {
   const bytes = (stats.estimatedBytes / MiB).toFixed(1);
   const peak = (stats.peakBytes / MiB).toFixed(1);
-  return `${stats.activeCount} kept · ${bytes} MiB · peak ${peak} MiB · pruned ${stats.prunedCount}`;
+  const rss = (stats.shellRssBytes / MiB).toFixed(0);
+  return `${stats.activeCount} kept · ${bytes} MiB · peak ${peak} MiB · shell ${rss} MiB · pruned ${stats.prunedCount}`;
 }

@@ -47,10 +47,10 @@ describe("mappings", () => {
       estimatedBytes: 2 * 1024 * 1024,
       peakBytes: 4 * 1024 * 1024,
       prunedCount: 12,
-      shellRssBytes: 0,
+      shellRssBytes: 512 * 1024 * 1024,
       adapterId: "v46",
       tier: 2,
     };
-    expect(formatStats(stats)).toBe("3 kept · 2.0 MiB · peak 4.0 MiB · pruned 12");
+    expect(formatStats(stats)).toBe("3 kept · 2.0 MiB · peak 4.0 MiB · shell 512 MiB · pruned 12");
   });
 });

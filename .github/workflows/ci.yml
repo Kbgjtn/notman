@@ -38,6 +38,11 @@ jobs:
       - name: Build, typecheck, test, lint and validate schema
         run: make check
 
+      - name: Verify committed benchmark report
+        run: |
+          make report
+          git diff --exit-code -- results/report.md
+
       - name: Package the extension
         run: make pack
 
