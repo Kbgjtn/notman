@@ -31,18 +31,19 @@ screenshot tool or the files on disk.
 ### Measured proof
 
 Baseline on this machine (X11, GNOME Shell 46.0, DND on, 10 × `Shift+Print`,
-pinned to one CPU with `taskset`, bounded by `timeout 60s`):
+pinned to one CPU with `taskset`, bounded by `timeout 60s`, screenshot saving
+disabled for the run):
 
 | Measurement                          | gnome-shell RSS |
 | ------------------------------------ | --------------- |
-| Before                               | 669,972 kB      |
-| After 10 screenshots                 | 1,069,800 kB    |
-| Growth                               | **+399,828 kB** |
-| Average per shot after the first one | ~45,300 kB      |
+| Before                               | 656,484 kB      |
+| After 10 screenshots                 | 1,096,748 kB    |
+| Growth                               | **+440,264 kB** |
+| Average per shot after the first one | ~45,700 kB      |
 
 Raw per-shot samples are in `results/baseline.csv`. The growth is linear in the
-number of screenshots, while only 9 files were written (same-second filename
-collisions) — disk output does not explain the memory increase.
+number of screenshots, and no screenshot files were written at all — disk
+output cannot explain the memory increase.
 
 ### Why GNOME Settings cannot fix it
 
@@ -82,7 +83,7 @@ releases of `@girs/gnome-shell` still declare the pre-45 prefs resource path;
 
 ```sh
 make             # compile TypeScript into dist/
-make check       # schema + import pinning + typecheck + unit tests
+make check       # schema, imports, scripts, lint, unit tests, typecheck
 make dev-install # symlink dist/ into ~/.local/share/gnome-shell/extensions/
 gnome-extensions enable notman@ozy.local
 ```
