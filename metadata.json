@@ -1,6 +1,6 @@
 {
   "name": "Notman",
-  "description": "Notification manager for GNOME Shell: compact screenshot thumbnails, screencast controls, DND transient expiry, and global retention limits.",
+  "description": "Notification manager for GNOME Shell: compact screenshot thumbnails, screencast controls, DND transient expiry, and global retention limits. Compact mode reads the screenshot image from the clipboard.",
   "uuid": "notman@kbgjtn.github.io",
   "url": "https://github.com/Kbgjtn/notman",
   "gettext-domain": "notman",
