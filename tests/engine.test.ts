@@ -523,4 +523,39 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(0);
     expect(engine.getStats().prunedCount).toBe(1);
   });
+
+  it("accumulates savedBytes across compact, downgrade, and destroy without double counting", () => {
+    const first = new FakeHandle(1, SourceKey.Screenshot, 10, 10_000_000);
+    const second = new FakeHandle(2, SourceKey.Screenshot, 20, 5_000_000);
+    const notifications = new Map<unknown, number>([
+      [{}, 1],
+      [{}, 2],
+    ]);
+    const [firstNotif, secondNotif] = [...notifications.keys()];
+    const settings = makeSettings({ thumbnailMode: ThumbnailMode.Compact });
+    const store = makeSettingsStore(settings);
+    const bridge = makeBridge(
+      new Map([
+        [1, first],
+        [2, second],
+      ]),
+      notifications,
+    );
+    const engine = new Engine(store, bridge, "v46", CapabilityTier.TopBar, new FakeScheduler());
+
+    engine.onNotificationAdded(firstNotif);
+    // Compacted from 10_000_000 -> 36_864
+    expect(engine.getStats().savedBytes).toBe(10_000_000 - 36_864);
+    // Calling getStats() again must not double-count.
+    expect(engine.getStats().savedBytes).toBe(10_000_000 - 36_864);
+
+    // Switching to text-only frees the remaining 36_864 on first, and 5_000_000 on second.
+    settings.thumbnailMode = ThumbnailMode.TextOnly;
+    engine.onNotificationAdded(secondNotif);
+    expect(engine.getStats().savedBytes).toBe(15_000_000);
+
+    // Destroying already-downgraded (0 B) handles adds 0.
+    engine.clearScreenshots();
+    expect(engine.getStats().savedBytes).toBe(15_000_000);
+  });
 });

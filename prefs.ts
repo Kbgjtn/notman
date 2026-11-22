@@ -39,6 +39,12 @@ const PREFS_CSS = `
   background-color: alpha(@accent_bg_color, 0.16);
   border-color: @accent_bg_color;
 }
+.notman-stat-card {
+  border-radius: 12px;
+  border: 1px solid alpha(@window_fg_color, 0.1);
+  background-color: @card_bg_color;
+  padding: 14px 10px;
+}
 `;
 
 interface LiveStats {
@@ -46,6 +52,7 @@ interface LiveStats {
   readonly estimatedBytes: number;
   readonly peakBytes: number;
   readonly prunedCount: number;
+  readonly savedBytes: number;
 }
 
 function fetchStatsAsync(callback: (stats: LiveStats | null) => void): void {
@@ -72,6 +79,7 @@ function fetchStatsAsync(callback: (stats: LiveStats | null) => void): void {
           estimatedBytes: Number(dict.estimatedBytes.get_int64()),
           peakBytes: Number(dict.peakBytes.get_int64()),
           prunedCount: dict.prunedCount.get_int32(),
+          savedBytes: dict.savedBytes ? Number(dict.savedBytes.get_int64()) : 0,
         });
       } catch {
         callback(null);
@@ -209,10 +217,34 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const statusGroup = new Adw.PreferencesGroup({
       title: _("Status"),
     });
-    const activeRow = new Adw.ActionRow({ title: _("Active notifications") });
-    const prunedRow = new Adw.ActionRow({ title: _("Cleaned this session") });
-    statusGroup.add(activeRow);
-    statusGroup.add(prunedRow);
+    const statsGrid = new Gtk.Box({
+      orientation: Gtk.Orientation.HORIZONTAL,
+      homogeneous: true,
+      spacing: 10,
+    });
+    const makeStatTile = (caption: string): Gtk.Label => {
+      const tile = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 4,
+        css_classes: ["notman-stat-card"],
+      });
+      const value = new Gtk.Label({
+        label: "—",
+        css_classes: ["title-2"],
+      });
+      const label = new Gtk.Label({
+        label: caption,
+        css_classes: ["caption", "dim-label"],
+      });
+      tile.append(value);
+      tile.append(label);
+      statsGrid.append(tile);
+      return value;
+    };
+    const activeVal = makeStatTile(_("Active"));
+    const cleanedVal = makeStatTile(_("Cleaned"));
+    const savedVal = makeStatTile(_("RAM saved"));
+    statusGroup.add(statsGrid);
     generalPage.add(statusGroup);
 
     const refreshStatus = (): void => {
@@ -222,19 +254,18 @@ export default class NotmanPreferences extends ExtensionPreferences {
           statusGroup.description = _(
             "Notman isn't running right now. Enable the extension or reload GNOME Shell.",
           );
-          activeRow.subtitle = _("Unavailable");
-          prunedRow.subtitle = "—";
+          activeVal.label = "—";
+          cleanedVal.label = "—";
+          savedVal.label = "—";
           return;
         }
-        statusGroup.description = "";
-        activeRow.subtitle =
+        statusGroup.description =
           stats.estimatedBytes > 0
-            ? `${stats.activeCount} (${formatBytes(stats.estimatedBytes)})`
-            : String(stats.activeCount);
-        prunedRow.subtitle =
-          stats.peakBytes > 0
-            ? `${stats.prunedCount} · ${_("Peak")} ${formatBytes(stats.peakBytes)}`
-            : String(stats.prunedCount);
+            ? `${_("Current previews")}: ${formatBytes(stats.estimatedBytes)}`
+            : "";
+        activeVal.label = String(stats.activeCount);
+        cleanedVal.label = String(stats.prunedCount);
+        savedVal.label = stats.savedBytes > 0 ? formatBytes(stats.savedBytes) : "0 B";
       });
     };
     refreshStatus();

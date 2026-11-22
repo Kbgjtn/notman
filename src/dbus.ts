@@ -80,6 +80,7 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
                       estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
                       peakBytes: new GLib.Variant("x", stats.peakBytes),
                       prunedCount: new GLib.Variant("i", stats.prunedCount),
+                      savedBytes: new GLib.Variant("x", stats.savedBytes),
                       shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
                       adapterId: new GLib.Variant("s", stats.adapterId),
                       tier: new GLib.Variant("i", stats.tier),

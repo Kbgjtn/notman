@@ -27,6 +27,7 @@ export class Engine {
     new CapRule(),
   ];
   private readonly _handles = new Map<number, NotificationHandle>();
+  private readonly _lastBytes = new Map<number, number>();
   private readonly _pending = new Set<number>();
   private readonly _stats: Stats;
   private _sweepId: number | null = null;
@@ -70,6 +71,7 @@ export class Engine {
     }
     this._bridge.stop();
     this._handles.clear();
+    this._lastBytes.clear();
     this._pending.clear();
     this._stats.update([]);
     this._started = false;
@@ -81,6 +83,9 @@ export class Engine {
     const handle = this._bridge.makeHandle(notification, sourceKey);
     if (!handle) return;
     this._handles.set(handle.id, handle);
+    if (!this._lastBytes.has(handle.id)) {
+      this._lastBytes.set(handle.id, handle.estimatedBytes);
+    }
     // Immediate pass so notifyEnabled=false schedules destruction and text-only
     // swaps the full-size icon without waiting for the next sweep.
     if (!deferSweep) this.sweep();
@@ -90,6 +95,7 @@ export class Engine {
     const id = this._bridge.idFor(notification);
     if (id === null) return;
     this._handles.delete(id);
+    this._lastBytes.delete(id);
     this._pending.delete(id);
     this._stats.update([...this._handles.values()]);
   }
@@ -129,6 +135,7 @@ export class Engine {
         }
         for (const handle of outcome.destroy) this.destroyHandle(handle);
       }
+      this.reconcileSavedBytes();
       this._stats.update([...this._handles.values()]);
     } catch (e) {
       log.err("engine", "sweep failed", e);
@@ -137,8 +144,20 @@ export class Engine {
     }
   }
 
+  private reconcileSavedBytes(): void {
+    for (const handle of this._handles.values()) {
+      const current = handle.estimatedBytes;
+      const previous = this._lastBytes.get(handle.id);
+      if (previous !== undefined && current < previous) {
+        this._stats.saved(previous - current);
+      }
+      this._lastBytes.set(handle.id, current);
+    }
+  }
+
   private destroyHandle(handle: NotificationHandle): void {
     if (this._pending.has(handle.id)) return;
+    const bytesBefore = Math.max(handle.estimatedBytes, this._lastBytes.get(handle.id) ?? 0);
     let destroyed = false;
     try {
       destroyed = handle.destroy();
@@ -148,10 +167,13 @@ export class Engine {
     if (!destroyed) return;
     this._pending.add(handle.id);
     this._handles.delete(handle.id);
+    this._lastBytes.delete(handle.id);
     this._stats.pruned();
+    this._stats.saved(bytesBefore);
   }
 
   getStats(): StatsSnapshot {
+    this.reconcileSavedBytes();
     this._stats.update([...this._handles.values()]);
     this._stats.setRss(this._bridge.readRssBytes());
     return this._stats.snapshot();

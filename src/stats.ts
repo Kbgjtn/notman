@@ -5,6 +5,7 @@ export interface StatsSnapshot {
   readonly estimatedBytes: number;
   readonly peakBytes: number;
   readonly prunedCount: number;
+  readonly savedBytes: number;
   readonly shellRssBytes: number;
   readonly adapterId: string;
   readonly tier: CapabilityTier;
@@ -14,6 +15,7 @@ export class Stats {
   private _estimatedBytes = 0;
   private _peakBytes = 0;
   private _prunedCount = 0;
+  private _savedBytes = 0;
   private _shellRssBytes = 0;
   private _activeCount = 0;
 
@@ -32,6 +34,10 @@ export class Stats {
     this._prunedCount += count;
   }
 
+  saved(bytes: number): void {
+    if (bytes > 0) this._savedBytes += bytes;
+  }
+
   setRss(bytes: number): void {
     this._shellRssBytes = bytes;
   }
@@ -42,6 +48,7 @@ export class Stats {
       estimatedBytes: this._estimatedBytes,
       peakBytes: this._peakBytes,
       prunedCount: this._prunedCount,
+      savedBytes: this._savedBytes,
       shellRssBytes: this._shellRssBytes,
       adapterId: this._adapterId,
       tier: this._tier,

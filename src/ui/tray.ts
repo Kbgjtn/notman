@@ -42,7 +42,10 @@ export class TrayIndicator {
   private readonly _notifyItem: SwitchItem;
   private readonly _modeButtons: St.Button[] = [];
   private readonly _modeRow: PopupMenu.PopupBaseMenuItem;
-  private readonly _statusSeparator: PopupMenu.PopupSeparatorMenuItem;
+  private readonly _statsRow: PopupMenu.PopupBaseMenuItem;
+  private readonly _activeValue: St.Label;
+  private readonly _cleanedValue: St.Label;
+  private readonly _savedValue: St.Label;
   private _statsTimerId: number | null = null;
   private _disposed = false;
 
@@ -78,8 +81,13 @@ export class TrayIndicator {
     );
     this._modeRow = this.addPreviewModeBar();
 
-    this._statusSeparator = new PopupMenu.PopupSeparatorMenuItem("");
-    menu.addMenuItem(this._statusSeparator);
+    const statsCard = this.addStatsCard();
+    this._statsRow = statsCard.row;
+    this._activeValue = statsCard.activeValue;
+    this._cleanedValue = statsCard.cleanedValue;
+    this._savedValue = statsCard.savedValue;
+
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
     const prefsItem = new PopupMenu.PopupMenuItem(_("Settings"));
     prefsItem.connect("activate", () => {
@@ -256,16 +264,70 @@ export class TrayIndicator {
     return item;
   }
 
+  private addStatsCard(): {
+    row: PopupMenu.PopupBaseMenuItem;
+    activeValue: St.Label;
+    cleanedValue: St.Label;
+    savedValue: St.Label;
+  } {
+    const row = new PopupMenu.PopupBaseMenuItem({
+      reactive: false,
+      can_focus: false,
+    });
+    row.setOrnament(PopupMenu.Ornament.HIDDEN);
+
+    const card = new St.BoxLayout({
+      x_expand: true,
+      x_align: Clutter.ActorAlign.FILL,
+      style_class: "notman-stats-card",
+      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 0 }),
+    });
+
+    const makeCol = (caption: string): St.Label => {
+      const col = new St.BoxLayout({
+        vertical: true,
+        x_expand: true,
+        x_align: Clutter.ActorAlign.CENTER,
+        style_class: "notman-stat-col",
+      });
+      const value = new St.Label({
+        text: "0",
+        x_align: Clutter.ActorAlign.CENTER,
+        style_class: "notman-stat-value",
+      });
+      const label = new St.Label({
+        text: caption,
+        x_align: Clutter.ActorAlign.CENTER,
+        style_class: "notman-stat-label",
+      });
+      col.add_child(value);
+      col.add_child(label);
+      card.add_child(col);
+      return value;
+    };
+
+    const activeValue = makeCol(_("Active"));
+    const cleanedValue = makeCol(_("Cleaned"));
+    const savedValue = makeCol(_("Saved"));
+
+    row.add_child(card);
+    this._indicator.menu.addMenuItem(row);
+    return { row, activeValue, cleanedValue, savedValue };
+  }
+
   private refreshStatus(): void {
-    if (!this._settings.get_boolean(SettingKey.GuardEnabled)) {
-      this._statusSeparator.label.text = _("Paused");
+    const guardEnabled = this._settings.get_boolean(SettingKey.GuardEnabled);
+    this._statsRow.opacity = guardEnabled ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
+    if (!guardEnabled) {
+      this._activeValue.text = "—";
+      this._cleanedValue.text = "—";
+      this._savedValue.text = _("Paused");
       return;
     }
     const stats = this._engine.getStats();
-    const parts = [`${stats.activeCount} ${_("active")}`];
-    if (stats.estimatedBytes > 0) parts.push(formatBytes(stats.estimatedBytes));
-    if (stats.prunedCount > 0) parts.push(`${stats.prunedCount} ${_("cleaned")}`);
-    this._statusSeparator.label.text = parts.join(" · ");
+    this._activeValue.text = String(stats.activeCount);
+    this._cleanedValue.text = String(stats.prunedCount);
+    this._savedValue.text = stats.savedBytes > 0 ? formatBytes(stats.savedBytes) : "0 B";
   }
 
   private refreshAll(): void {
