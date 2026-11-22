@@ -37,83 +37,97 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
     return false;
   }
 
-  const ownerId = Gio.bus_own_name(
-    Gio.BusType.SESSION,
-    BUS_NAME,
-    Gio.BusNameOwnerFlags.NONE,
-    (connection) => {
-      try {
-        const registrationId = connection.register_object(
-          OBJECT_PATH,
-          interfaceInfo,
-          (
-            _connection: Gio.DBusConnection,
-            _sender: string,
-            _path: string,
-            _interface: string,
-            method: string,
-            params: GLib.Variant,
-            invocation: Gio.DBusMethodInvocation,
-          ) => {
-            switch (method) {
-              case "GetStats": {
-                const stats = engine.getStats();
-                const dict: Record<string, GLib.Variant> = {
-                  activeCount: new GLib.Variant("i", stats.activeCount),
-                  estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
-                  peakBytes: new GLib.Variant("x", stats.peakBytes),
-                  prunedCount: new GLib.Variant("i", stats.prunedCount),
-                  shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
-                  adapterId: new GLib.Variant("s", stats.adapterId),
-                  tier: new GLib.Variant("i", stats.tier),
-                };
-                const result = new GLib.Variant("(a{sv})", [dict]);
-                invocation.return_value(
-                  result as unknown as Parameters<typeof invocation.return_value>[0],
-                );
-                break;
+  let stopped = false;
+  let ownerId = 0;
+  try {
+    ownerId = Gio.bus_own_name(
+      Gio.BusType.SESSION,
+      BUS_NAME,
+      Gio.BusNameOwnerFlags.NONE,
+      (connection) => {
+        // bus_acquired is asynchronous; teardown may have happened already.
+        if (stopped) return;
+        try {
+          const registrationId = connection.register_object(
+            OBJECT_PATH,
+            interfaceInfo,
+            (
+              _connection: Gio.DBusConnection,
+              _sender: string,
+              _path: string,
+              _interface: string,
+              method: string,
+              params: GLib.Variant,
+              invocation: Gio.DBusMethodInvocation,
+            ) => {
+              switch (method) {
+                case "GetStats": {
+                  const stats = engine.getStats();
+                  const dict: Record<string, GLib.Variant> = {
+                    activeCount: new GLib.Variant("i", stats.activeCount),
+                    estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
+                    peakBytes: new GLib.Variant("x", stats.peakBytes),
+                    prunedCount: new GLib.Variant("i", stats.prunedCount),
+                    shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
+                    adapterId: new GLib.Variant("s", stats.adapterId),
+                    tier: new GLib.Variant("i", stats.tier),
+                  };
+                  const result = new GLib.Variant("(a{sv})", [dict]);
+                  invocation.return_value(
+                    result as unknown as Parameters<typeof invocation.return_value>[0],
+                  );
+                  break;
+                }
+                case "ClearScreenshots":
+                  engine.clearScreenshots();
+                  invocation.return_value(null);
+                  break;
+                // SetEnabled and SetMaxCount write to GSettings, so changes
+                // made here persist across shell restarts.
+                case "SetEnabled": {
+                  const [enabled] = params.deepUnpack() as [boolean];
+                  engine.setEnabled(enabled);
+                  invocation.return_value(null);
+                  break;
+                }
+                case "SetMaxCount": {
+                  const [count] = params.deepUnpack() as [number];
+                  engine.setMaxCount(count);
+                  invocation.return_value(null);
+                  break;
+                }
+                default:
+                  invocation.return_dbus_error(
+                    "org.freedesktop.DBus.Error.UnknownMethod",
+                    `Unknown method: ${method}`,
+                  );
               }
-              case "ClearScreenshots":
-                engine.clearScreenshots();
-                invocation.return_value(null);
-                break;
-              case "SetEnabled": {
-                const [enabled] = params.deepUnpack() as [boolean];
-                engine.setEnabled(enabled);
-                invocation.return_value(null);
-                break;
-              }
-              case "SetMaxCount": {
-                const [count] = params.deepUnpack() as [number];
-                engine.setMaxCount(count);
-                invocation.return_value(null);
-                break;
-              }
-              default:
-                invocation.return_dbus_error(
-                  "org.freedesktop.DBus.Error.UnknownMethod",
-                  `Unknown method: ${method}`,
-                );
+            },
+            null,
+            null,
+          );
+          disposables.add(() => {
+            try {
+              connection.unregister_object(registrationId);
+            } catch {
+              // Connection may already be closed.
             }
-          },
-          null,
-          null,
-        );
-        disposables.add(() => {
-          try {
-            connection.unregister_object(registrationId);
-          } catch {
-            // Connection may already be closed.
-          }
-        });
-      } catch (e) {
-        logErr(e, "notman: D-Bus object registration failed");
-      }
-    },
-    null,
-    () => {},
-  );
+          });
+        } catch (e) {
+          logErr(e, "notman: D-Bus object registration failed");
+        }
+      },
+      null,
+      () => {},
+    );
+  } catch (e) {
+    logErr(e, "notman: D-Bus name acquisition failed");
+    return false;
+  }
 
-  disposables.add(() => Gio.bus_unown_name(ownerId));
+  disposables.add(() => {
+    stopped = true;
+    if (ownerId !== 0) Gio.bus_unown_name(ownerId);
+  });
   return ownerId !== 0;
 }

@@ -46,9 +46,12 @@ export default class NotmanExtension extends Extension {
         return;
       }
 
-      registerDbus(engine, disposables);
+      // Publish the references before registering D-Bus: its callback is
+      // asynchronous and a failure must still be fully teardown-able.
       this._engine = engine;
       this._disposables = disposables;
+      if (!registerDbus(engine, disposables))
+        log("notman: D-Bus API unavailable, guard still active");
       log(`notman: enabled (adapter=${adapter.id}, tier=${tier})`);
     } catch (e) {
       logErr(e, "notman: enable failed");
