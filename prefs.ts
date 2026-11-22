@@ -144,6 +144,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const settings = this.getSettings();
     const bindings: Array<{ target: unknown; property: string }> = [];
     const signalIds: number[] = [];
+    const ioCancellable = new Gio.Cancellable();
     let statsTimerId: number | null = null;
     let disposed = false;
 
@@ -442,9 +443,10 @@ export default class NotmanPreferences extends ExtensionPreferences {
       const minSpin = new Gtk.SpinButton({
         adjustment: new Gtk.Adjustment({
           lower: 0,
-          upper: 55,
+          upper: 59,
           step_increment: 5,
-          value: Math.floor((initial % 60) / 5) * 5,
+          page_increment: 15,
+          value: initial % 60,
         }),
         wrap: true,
         width_chars: 2,
@@ -771,6 +773,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
       const pickAppRow = new Adw.ComboRow({
         title: _("Pick an app"),
         model: appNames,
+        expression: Gtk.PropertyExpression.new(Gtk.StringObject.$gtype, null, "string"),
         enable_search: true,
       });
       const pickAddBtn = makeActionButton(_("Add"), "suggested");
@@ -790,8 +793,18 @@ export default class NotmanPreferences extends ExtensionPreferences {
     appRulesGroup.add(addRuleRow);
 
     const renderedRuleRows: Adw.ExpanderRow[] = [];
+    let updatingRulesInPlace = false;
+
+    const formatRuleSummary = (entry: AppRuleEntry): string => {
+      const summaryParts: string[] = [];
+      if (entry.muted) summaryParts.push(_("Muted"));
+      if (!entry.muted && entry.maxCount > 0) summaryParts.push(`${_("Max")} ${entry.maxCount}`);
+      if (!entry.muted && entry.expireSeconds > 0) summaryParts.push(`${entry.expireSeconds}s`);
+      return summaryParts.length > 0 ? summaryParts.join(" · ") : _("No limits set");
+    };
 
     const rebuildAppRuleRows = (): void => {
+      if (updatingRulesInPlace) return;
       while (renderedRuleRows.length > 0) {
         const old = renderedRuleRows.pop();
         if (old) appRulesGroup.remove(old);
@@ -799,13 +812,9 @@ export default class NotmanPreferences extends ExtensionPreferences {
       const rules = parseAppRules(settings.get_string(SettingKey.AppRules));
       for (let idx = 0; idx < rules.length; idx++) {
         const entry = rules[idx];
-        const summaryParts: string[] = [];
-        if (entry.muted) summaryParts.push(_("Muted"));
-        if (!entry.muted && entry.maxCount > 0) summaryParts.push(`${_("Max")} ${entry.maxCount}`);
-        if (!entry.muted && entry.expireSeconds > 0) summaryParts.push(`${entry.expireSeconds}s`);
         const expander = new Adw.ExpanderRow({
           title: entry.match,
-          subtitle: summaryParts.length > 0 ? summaryParts.join(" · ") : _("No limits set"),
+          subtitle: formatRuleSummary(entry),
         });
 
         const muteRow = new Adw.SwitchRow({
@@ -813,14 +822,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
           subtitle: _("Dismiss alerts from this app immediately."),
           active: entry.muted,
         });
-        muteRow.connect("notify::active", () => {
-          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
-          if (!next[idx]) return;
-          next[idx] = { ...next[idx], muted: muteRow.active };
-          writeAppRules(next);
-        });
-        expander.add_row(muteRow);
-
         const maxRow = new Adw.SpinRow({
           title: _("Max kept"),
           adjustment: new Gtk.Adjustment({
@@ -831,14 +832,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
           }),
           sensitive: !entry.muted,
         });
-        maxRow.connect("notify::value", () => {
-          const next = parseAppRules(settings.get_string(SettingKey.AppRules));
-          if (!next[idx]) return;
-          next[idx] = { ...next[idx], maxCount: Math.round(maxRow.value) };
-          writeAppRules(next);
-        });
-        expander.add_row(maxRow);
-
         const expRow = new Adw.SpinRow({
           title: _("Clear after (seconds)"),
           adjustment: new Gtk.Adjustment({
@@ -849,12 +842,34 @@ export default class NotmanPreferences extends ExtensionPreferences {
           }),
           sensitive: !entry.muted,
         });
-        expRow.connect("notify::value", () => {
+
+        const commitInPlace = (patch: Partial<AppRuleEntry>): void => {
           const next = parseAppRules(settings.get_string(SettingKey.AppRules));
           if (!next[idx]) return;
-          next[idx] = { ...next[idx], expireSeconds: Math.round(expRow.value) };
-          writeAppRules(next);
-        });
+          const updated: AppRuleEntry = { ...next[idx], ...patch };
+          next[idx] = updated;
+          expander.subtitle = formatRuleSummary(updated);
+          maxRow.sensitive = !updated.muted;
+          expRow.sensitive = !updated.muted;
+          updatingRulesInPlace = true;
+          try {
+            writeAppRules(next);
+          } finally {
+            updatingRulesInPlace = false;
+          }
+        };
+
+        muteRow.connect("notify::active", () => commitInPlace({ muted: muteRow.active }));
+        expander.add_row(muteRow);
+
+        maxRow.connect("notify::value", () =>
+          commitInPlace({ maxCount: Math.round(maxRow.value) }),
+        );
+        expander.add_row(maxRow);
+
+        expRow.connect("notify::value", () =>
+          commitInPlace({ expireSeconds: Math.round(expRow.value) }),
+        );
         expander.add_row(expRow);
 
         const removeBtn = makeActionButton(_("Remove"), "destructive");
@@ -920,18 +935,22 @@ export default class NotmanPreferences extends ExtensionPreferences {
         title: _("Export Notman settings"),
         initial_name: "notman-settings.json",
       });
-      dialog.save(window, null, (_dlg, result) => {
+      dialog.save(window, ioCancellable, (_dlg, result) => {
+        if (disposed || ioCancellable.is_cancelled()) return;
         try {
           const file = dialog.save_finish(result);
           if (!file) return;
-          const payload = new TextEncoder().encode(exportSettingsJson(settings as never));
-          file.replace_contents_async(
-            payload,
+          const payload = new GLib.Bytes(
+            new TextEncoder().encode(exportSettingsJson(settings as never)),
+          );
+          file.replace_contents_bytes_async(
+            payload as never,
             null,
             false,
             Gio.FileCreateFlags.REPLACE_DESTINATION,
-            null,
+            ioCancellable,
             (_f, writeRes) => {
+              if (disposed || ioCancellable.is_cancelled()) return;
               try {
                 file.replace_contents_finish(writeRes);
                 showToast(_("Settings exported"));
@@ -963,11 +982,13 @@ export default class NotmanPreferences extends ExtensionPreferences {
         title: _("Import Notman settings"),
         filters,
       });
-      dialog.open(window, null, (_dlg, result) => {
+      dialog.open(window, ioCancellable, (_dlg, result) => {
+        if (disposed || ioCancellable.is_cancelled()) return;
         try {
           const file = dialog.open_finish(result);
           if (!file) return;
-          file.load_contents_async(null, (_f, loadRes) => {
+          file.load_contents_async(ioCancellable, (_f, loadRes) => {
+            if (disposed || ioCancellable.is_cancelled()) return;
             try {
               const [ok, bytes] = file.load_contents_finish(loadRes);
               if (!ok) {
@@ -997,9 +1018,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const resetButton = makeActionButton(_("Reset"), "destructive");
     resetButton.connect("clicked", () => {
-      const confirm = new Adw.MessageDialog({
-        transient_for: window,
-        modal: true,
+      const confirm = new Adw.AlertDialog({
         heading: _("Reset all settings?"),
         body: _(
           "This will restore default values and remove any custom per-app rules and quiet hours.",
@@ -1010,18 +1029,23 @@ export default class NotmanPreferences extends ExtensionPreferences {
       confirm.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE);
       confirm.set_default_response("cancel");
       confirm.set_close_response("cancel");
-      confirm.connect("response", (_dlg, response) => {
-        if (response !== "reset") return;
-        for (const key of Object.values(SettingKey)) {
-          try {
-            settings.reset(key);
-          } catch {
-            // Ignore individual key reset failures.
+      confirm.choose(window, ioCancellable, (_dlg, result) => {
+        if (disposed || ioCancellable.is_cancelled()) return;
+        try {
+          const response = confirm.choose_finish(result);
+          if (response !== "reset") return;
+          for (const key of Object.values(SettingKey)) {
+            try {
+              settings.reset(key);
+            } catch {
+              // Ignore individual key reset failures.
+            }
           }
+          showToast(_("Settings reset to defaults"));
+        } catch {
+          // Dialog dismissed or cancelled.
         }
-        showToast(_("Settings reset to defaults"));
       });
-      confirm.present();
     });
     const resetRow = new Adw.ActionRow({
       title: _("Reset settings"),
@@ -1048,6 +1072,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const cleanup = (): void => {
       if (disposed) return;
       disposed = true;
+      ioCancellable.cancel();
       if (statsTimerId !== null) {
         GLib.source_remove(statsTimerId);
         statsTimerId = null;

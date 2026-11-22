@@ -148,10 +148,34 @@ describe("config-io", () => {
     expect(dst.store[SettingKey.QuietHoursStart]).toBe("23:15");
   });
 
-  it("throws on invalid JSON payload", () => {
-    const dst = memoryBackend();
+  it("throws on invalid JSON payload and ignores invalid enums or malformed app rules", () => {
+    const dst = memoryBackend({
+      [SettingKey.ScreenshotThumbnailMode]: ThumbnailMode.Compact,
+      [SettingKey.IndicatorPosition]: IndicatorPosition.Left,
+      [SettingKey.AppRules]: JSON.stringify([
+        { match: "slack", muted: true, maxCount: 0, expireSeconds: 0 },
+      ]),
+    });
     expect(() => importSettingsJson("not json", dst.backend)).toThrow();
     expect(() => importSettingsJson("{}", dst.backend)).toThrow();
+    expect(() => importSettingsJson('{"settings":[]}', dst.backend)).toThrow();
+
+    const count = importSettingsJson(
+      JSON.stringify({
+        settings: {
+          [SettingKey.ScreenshotThumbnailMode]: "bogus",
+          [SettingKey.IndicatorPosition]: "top",
+          [SettingKey.AppRules]: "not-json",
+          [SettingKey.QuietHoursStart]: "8:05",
+        },
+      }),
+      dst.backend,
+    );
+    expect(count).toBe(1);
+    expect(dst.store[SettingKey.ScreenshotThumbnailMode]).toBe(ThumbnailMode.Compact);
+    expect(dst.store[SettingKey.IndicatorPosition]).toBe(IndicatorPosition.Left);
+    expect(dst.store[SettingKey.AppRules]).toContain("slack");
+    expect(dst.store[SettingKey.QuietHoursStart]).toBe("08:05");
   });
 });
 
@@ -160,6 +184,7 @@ describe("QuietHoursController", () => {
     expect(parseTimeMinutes("22:00")).toBe(22 * 60);
     expect(parseTimeMinutes("invalid")).toBeNull();
     expect(formatTimeMinutes(8, 5)).toBe("08:05");
+    expect(formatTimeMinutes(Number.NaN, Number.POSITIVE_INFINITY)).toBe("00:00");
 
     // Overnight: 22:00 -> 08:00
     expect(isWithinQuietHours(23 * 60, 22 * 60, 8 * 60)).toBe(true);
@@ -207,5 +232,37 @@ describe("QuietHoursController", () => {
     expect(showBanners).toBe(false);
 
     controller.stop();
+  });
+
+  it("keeps DND active on screen-lock stop(false) and restores on invalid time config", () => {
+    let showBanners = true;
+    let start = "22:00";
+    const scheduler = new FakeScheduler();
+    const controller = new QuietHoursController(
+      () => ({ enabled: true, start, end: "08:00" }),
+      {
+        getShowBanners: () => showBanners,
+        setShowBanners: (v) => {
+          showBanners = v;
+        },
+      },
+      scheduler,
+      () => 23 * 60,
+    );
+
+    controller.start();
+    expect(showBanners).toBe(false);
+
+    // Invalid time string restores managed DND instead of leaving it stuck on.
+    start = "invalid";
+    controller.sync();
+    expect(showBanners).toBe(true);
+
+    // Re-enter quiet hours, then simulate screen lock disable (restore=false).
+    start = "22:00";
+    controller.sync();
+    expect(showBanners).toBe(false);
+    controller.stop(false);
+    expect(showBanners).toBe(false);
   });
 });

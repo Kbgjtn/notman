@@ -1,5 +1,6 @@
 import Gio from "gi://Gio";
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { detectAdapter } from "./src/compat/adapter.js";
 import { registerDbus } from "./src/dbus.js";
@@ -95,12 +96,7 @@ export default class NotmanExtension extends Extension {
           },
           scheduler,
         );
-        quietHours.start();
-        const quietIds = [
-          rawSettings.connect(`changed::${SettingKey.QuietHoursEnabled}`, () => quietHours.sync()),
-          rawSettings.connect(`changed::${SettingKey.QuietHoursStart}`, () => quietHours.sync()),
-          rawSettings.connect(`changed::${SettingKey.QuietHoursEnd}`, () => quietHours.sync()),
-        ];
+        const quietIds: number[] = [];
         disposables.add(() => {
           for (const id of quietIds) {
             try {
@@ -109,8 +105,17 @@ export default class NotmanExtension extends Extension {
               // Settings may already be gone.
             }
           }
-          quietHours.stop();
+          const isScreenLocked = Boolean(
+            (Main as unknown as { sessionMode?: { isLocked?: boolean } }).sessionMode?.isLocked,
+          );
+          quietHours.stop(!isScreenLocked);
         });
+        quietHours.start();
+        quietIds.push(
+          rawSettings.connect(`changed::${SettingKey.QuietHoursEnabled}`, () => quietHours.sync()),
+          rawSettings.connect(`changed::${SettingKey.QuietHoursStart}`, () => quietHours.sync()),
+          rawSettings.connect(`changed::${SettingKey.QuietHoursEnd}`, () => quietHours.sync()),
+        );
       } catch (e) {
         log.warn("extension", `quiet hours unavailable: ${String(e)}`);
       }

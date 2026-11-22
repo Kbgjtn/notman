@@ -63,7 +63,6 @@ export class TrayIndicator {
       style_class: "system-status-icon",
     });
     this._indicator.add_child(this._icon);
-    Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
 
     const menu = this._indicator.menu;
 
@@ -114,7 +113,10 @@ export class TrayIndicator {
       this._icon.opacity = guardEnabled ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
       this._notifyItem.setSensitive(guardEnabled);
       this._modeRow.opacity = modeActive ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
-      for (const button of this._modeButtons) button.reactive = modeActive;
+      for (const button of this._modeButtons) {
+        button.reactive = modeActive;
+        button.can_focus = modeActive;
+      }
       this.refreshStatus();
     };
     this.watchSetting(SettingKey.GuardEnabled, syncVisualState);
@@ -144,6 +146,7 @@ export class TrayIndicator {
       }
     });
 
+    Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
     log.info("tray", "status indicator added");
   }
 
@@ -247,7 +250,7 @@ export class TrayIndicator {
   private makeModeButton(label: string, extraClass?: string): St.Button {
     return new St.Button({
       label,
-      toggle_mode: true,
+      toggle_mode: false,
       track_hover: true,
       can_focus: true,
       x_expand: true,
@@ -301,7 +304,7 @@ export class TrayIndicator {
       isLast = false,
     ): St.Label => {
       const col = new St.BoxLayout({
-        vertical: true,
+        layout_manager: new Clutter.BoxLayout({ orientation: Clutter.Orientation.VERTICAL }),
         x_expand: true,
         x_align: Clutter.ActorAlign.FILL,
         style_class: isLast

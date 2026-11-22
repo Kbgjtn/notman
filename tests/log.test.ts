@@ -3,62 +3,57 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { log } from "../src/log.js";
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   log.setDebugEnabled(false);
 });
 
 describe("log", () => {
   it("formats info and warn as <level>(<scope>): <message>", () => {
-    const output = vi.fn();
-    vi.stubGlobal("log", output);
+    const infoSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     log.info("engine", "started");
     log.warn("settings", "using default");
 
-    expect(output.mock.calls.map((call) => call[0])).toEqual([
-      "info(engine): started",
-      "warn(settings): using default",
-    ]);
+    expect(infoSpy).toHaveBeenCalledWith("info(engine): started");
+    expect(warnSpy).toHaveBeenCalledWith("warn(settings): using default");
   });
 
   it("gates debug output behind setDebugEnabled", () => {
-    const output = vi.fn();
-    vi.stubGlobal("log", output);
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
 
     log.debug("bridge", "hidden");
-    expect(output).not.toHaveBeenCalled();
+    expect(debugSpy).not.toHaveBeenCalled();
 
     log.setDebugEnabled(true);
     log.debug("bridge", "visible");
-    expect(output).toHaveBeenCalledWith("debug(bridge): visible");
+    expect(debugSpy).toHaveBeenCalledWith("debug(bridge): visible");
   });
 
-  it("passes errors and the formatted line to logError", () => {
-    const logError = vi.fn();
-    vi.stubGlobal("logError", logError);
+  it("passes Error instances and formatted message to console.error", () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const error = new Error("boom");
 
     log.err("scheduler", "sweep failed", error);
 
-    expect(logError).toHaveBeenCalledOnce();
-    const [wrapped, message] = logError.mock.calls[0];
-    expect(wrapped).toBe(error);
-    expect(message).toBe("err(scheduler): sweep failed | boom");
+    expect(errSpy).toHaveBeenCalledWith(error, "err(scheduler): sweep failed | boom");
   });
 
-  it("falls back to plain log when logError is unavailable", () => {
-    const output = vi.fn();
-    vi.stubGlobal("log", output);
-    vi.stubGlobal("logError", undefined);
+  it("formats non-Error details cleanly in console.error", () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     log.err("engine", "destroy failed", "plain reason");
 
-    expect(output).toHaveBeenCalledWith("err(engine): destroy failed | plain reason");
+    expect(errSpy).toHaveBeenCalledWith("err(engine): destroy failed | plain reason");
   });
 
-  it("never throws when logging globals are missing", () => {
-    vi.stubGlobal("log", undefined);
-    vi.stubGlobal("logError", undefined);
+  it("never throws when console methods throw", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {
+      throw new Error("broken");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {
+      throw new Error("broken");
+    });
     expect(() => log.info("engine", "quiet")).not.toThrow();
     expect(() => log.err("engine", "quiet", new Error("x"))).not.toThrow();
   });

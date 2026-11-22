@@ -63,6 +63,7 @@ export interface NotificationHandle {
   readonly forFeedback: boolean;
   readonly isTransient: boolean;
   isCompacted(): boolean;
+  isCompacting?(): boolean;
   compact(): void;
   isDowngraded(): boolean;
   downgrade(): void;

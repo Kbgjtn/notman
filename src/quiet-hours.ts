@@ -11,8 +11,10 @@ export function parseTimeMinutes(value: string): number | null {
 }
 
 export function formatTimeMinutes(hours: number, minutes: number): string {
-  const h = Math.min(23, Math.max(0, Math.round(hours)));
-  const m = Math.min(59, Math.max(0, Math.round(minutes)));
+  const safeHours = Number.isFinite(hours) ? hours : 0;
+  const safeMinutes = Number.isFinite(minutes) ? minutes : 0;
+  const h = Math.min(23, Math.max(0, Math.round(safeHours)));
+  const m = Math.min(59, Math.max(0, Math.round(safeMinutes)));
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
@@ -70,7 +72,10 @@ export class QuietHoursController {
       }
       const start = parseTimeMinutes(cfg.start);
       const end = parseTimeMinutes(cfg.end);
-      if (start === null || end === null) return;
+      if (start === null || end === null) {
+        this.restoreIfManaged();
+        return;
+      }
 
       const inWindow = isWithinQuietHours(this._nowMinutes(), start, end);
       if (inWindow) {
@@ -87,12 +92,16 @@ export class QuietHoursController {
     }
   }
 
-  stop(): void {
+  stop(restore = true): void {
     if (this._timerId !== null) {
       this._scheduler.cancel(this._timerId);
       this._timerId = null;
     }
-    this.restoreIfManaged();
+    if (restore) {
+      this.restoreIfManaged();
+    } else {
+      this._activatedBySchedule = false;
+    }
   }
 
   private restoreIfManaged(): void {

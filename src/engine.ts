@@ -98,6 +98,11 @@ export class Engine {
   onNotificationDestroyed(notification: unknown): void {
     const id = this._bridge.idFor(notification);
     if (id === null) return;
+    const handle = this._handles.get(id);
+    const previous = this._lastBytes.get(id);
+    if (handle && previous !== undefined && handle.estimatedBytes < previous) {
+      this._stats.saved(previous - handle.estimatedBytes);
+    }
     this._handles.delete(id);
     this._lastBytes.delete(id);
     this._pending.delete(id);
@@ -162,14 +167,17 @@ export class Engine {
   private destroyHandle(handle: NotificationHandle): void {
     if (this._pending.has(handle.id)) return;
     const bytesBefore = Math.max(handle.estimatedBytes, this._lastBytes.get(handle.id) ?? 0);
+    this._pending.add(handle.id);
     let destroyed = false;
     try {
       destroyed = handle.destroy();
     } catch (e) {
       log.err("engine", "destroying notification failed", e);
     }
-    if (!destroyed) return;
-    this._pending.add(handle.id);
+    if (!destroyed) {
+      this._pending.delete(handle.id);
+      return;
+    }
     this._handles.delete(handle.id);
     this._lastBytes.delete(handle.id);
     this._stats.pruned();

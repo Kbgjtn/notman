@@ -54,18 +54,27 @@ export class ScreenshotRule implements Rule {
       const limit = settings.memoryBudgetMb * MiB;
       const surviving = oldestFirst.filter((h) => !destroySet.has(h));
       const effectiveBytes = (h: NotificationHandle): number =>
-        willCompactNew && !h.isCompacted() && !h.isDowngraded() ? 0 : h.estimatedBytes;
+        willCompactNew && (!h.isCompacted() || h.isCompacting?.()) && !h.isDowngraded()
+          ? 0
+          : h.estimatedBytes;
       let total = surviving.reduce((sum, h) => sum + effectiveBytes(h), 0);
       for (const handle of surviving) {
         if (total <= limit) break;
+        const bytes = effectiveBytes(handle);
+        if (bytes <= 0) continue;
         destroySet.add(handle);
-        total -= effectiveBytes(handle);
+        total -= bytes;
       }
     }
 
     if (willCompactNew) {
       for (const handle of oldestFirst) {
-        if (!destroySet.has(handle) && !handle.isCompacted() && !handle.isDowngraded()) {
+        if (
+          !destroySet.has(handle) &&
+          !handle.isCompacted() &&
+          !handle.isCompacting?.() &&
+          !handle.isDowngraded()
+        ) {
           outcome.compact.push(handle);
         }
       }

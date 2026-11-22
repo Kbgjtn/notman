@@ -76,12 +76,14 @@ function decodeUtf8(bytes: Uint8Array): string {
 export class ShellBridge implements Bridge {
   private readonly _ids = new WeakMap<object, number>();
   private readonly _destroyed = new WeakSet<object>();
+  private readonly _compacting = new WeakSet<object>();
   private readonly _compacted = new WeakSet<object>();
   private readonly _compactBytes = new WeakMap<object, number>();
   private readonly _downgraded = new WeakSet<object>();
   private readonly _seenSources = new WeakSet<object>();
   private readonly _attachedNotifications = new WeakSet<object>();
   private readonly _pendingDestroys = new Set<number>();
+  private readonly _pendingDestroyByTarget = new WeakMap<object, number>();
   private readonly _pendingCancellables = new Set<Gio.Cancellable>();
   private readonly _cancellables = new WeakMap<object, Gio.Cancellable>();
   private _inFlightCompactions = 0;
@@ -210,17 +212,20 @@ export class ShellBridge implements Bridge {
       forFeedback: Boolean(target.forFeedback),
       isTransient,
       isCompacted: (): boolean => this._compacted.has(target),
+      isCompacting: (): boolean => this._compacting.has(target),
       compact: (): void => {
         if (
           this._compacted.has(target) ||
+          this._compacting.has(target) ||
           this._downgraded.has(target) ||
           this._destroyed.has(target) ||
           this._stopped
         ) {
           return;
         }
-        this._compacted.add(target);
+        this._compacting.add(target);
         if (this._inFlightCompactions >= MAX_IN_FLIGHT_COMPACTIONS) {
+          this._compacting.delete(target);
           log.debug(
             "bridge",
             `compact id=${id}: burst limit (${MAX_IN_FLIGHT_COMPACTIONS}) reached, falling back to text-only`,
@@ -233,6 +238,7 @@ export class ShellBridge implements Bridge {
         const release = (): void => {
           if (released) return;
           released = true;
+          this._compacting.delete(target);
           this._inFlightCompactions = Math.max(0, this._inFlightCompactions - 1);
         };
         try {
@@ -308,6 +314,7 @@ export class ShellBridge implements Bridge {
                     target.gicon = content;
                     const bytesEstimate = estimateContentBytes(content) || width * height * 4;
                     this._compactBytes.set(target, bytesEstimate);
+                    this._compacted.add(target);
                     log.debug(
                       "bridge",
                       `compacted id=${id} ${width}x${height} bytes=${bytesEstimate}`,
@@ -348,6 +355,9 @@ export class ShellBridge implements Bridge {
         log.debug("bridge", `destroy scheduled for id=${id}`);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           this._pendingDestroys.delete(sourceId);
+          if (this._pendingDestroyByTarget.get(target) === sourceId) {
+            this._pendingDestroyByTarget.delete(target);
+          }
           try {
             target.destroy(this._adapter.dismissedReason());
           } catch (e) {
@@ -358,6 +368,7 @@ export class ShellBridge implements Bridge {
         if (sourceId === 0) return false;
         this._destroyed.add(target);
         this._pendingDestroys.add(sourceId);
+        this._pendingDestroyByTarget.set(target, sourceId);
         return true;
       },
     };
@@ -447,7 +458,14 @@ export class ShellBridge implements Bridge {
       try {
         this._destroyed.add(notification);
         this.cancelCompaction(notification);
+        const pendingDestroyId = this._pendingDestroyByTarget.get(notification);
+        if (pendingDestroyId !== undefined) {
+          this._pendingDestroyByTarget.delete(notification);
+          this._pendingDestroys.delete(pendingDestroyId);
+          GLib.source_remove(pendingDestroyId);
+        }
         this._disposables.remove(dispose);
+        dispose();
         onDestroyed(notification);
       } catch (e) {
         log.err("bridge", "notification destroy handler failed", e);

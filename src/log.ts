@@ -1,6 +1,3 @@
-type LogErrorFn = (error: unknown, message?: string) => void;
-type LogFn = (message: string) => void;
-
 enum LogLevel {
   Debug = "debug",
   Info = "info",
@@ -8,46 +5,54 @@ enum LogLevel {
   Error = "err",
 }
 
-const globals = globalThis as { log?: LogFn; logError?: LogErrorFn };
 let debugEnabled = false;
 
-function emit(level: LogLevel, scope: string, message: string): void {
-  try {
-    globals.log?.(`${level}(${scope}): ${message}`);
-  } catch {
-    // Logging must never mask the original failure.
-  }
+function format(level: LogLevel, scope: string, message: string): string {
+  return `${level}(${scope}): ${message}`;
 }
 
-/** Minimal Zig-style logger: <level>(<scope>): <message>. */
+/** Minimal Zig-style logger backed by standard console.* (GNOME 45+ EGO compliant). */
 export const log = {
   setDebugEnabled(enabled: boolean): void {
     debugEnabled = enabled;
   },
 
   debug(scope: string, message: string): void {
-    if (debugEnabled) emit(LogLevel.Debug, scope, message);
+    if (!debugEnabled) return;
+    try {
+      console.debug(format(LogLevel.Debug, scope, message));
+    } catch {
+      // Logging must never mask the original failure.
+    }
   },
 
   info(scope: string, message: string): void {
-    emit(LogLevel.Info, scope, message);
+    try {
+      console.log(format(LogLevel.Info, scope, message));
+    } catch {
+      // Logging must never mask the original failure.
+    }
   },
 
   warn(scope: string, message: string): void {
-    emit(LogLevel.Warn, scope, message);
+    try {
+      console.warn(format(LogLevel.Warn, scope, message));
+    } catch {
+      // Logging must never mask the original failure.
+    }
   },
 
   err(scope: string, message: string, error?: unknown): void {
     const detail = error instanceof Error ? error.message : String(error ?? "");
-    const line = `${LogLevel.Error}(${scope}): ${message}${detail ? ` | ${detail}` : ""}`;
+    const line = format(LogLevel.Error, scope, `${message}${detail ? ` | ${detail}` : ""}`);
     try {
-      if (globals.logError) {
-        globals.logError(error instanceof Error ? error : new Error(detail || message), line);
-        return;
+      if (error instanceof Error) {
+        console.error(error, line);
+      } else {
+        console.error(line);
       }
     } catch {
-      // Fall through to plain logging.
+      // Logging must never mask the original failure.
     }
-    emit(LogLevel.Error, scope, `${message}${detail ? ` | ${detail}` : ""}`);
   },
 };

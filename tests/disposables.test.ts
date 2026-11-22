@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Disposables } from "../src/disposables.js";
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("Disposables", () => {
@@ -21,8 +21,7 @@ describe("Disposables", () => {
   });
 
   it("continues after a callback throws and logs the failure", () => {
-    const logError = vi.fn();
-    vi.stubGlobal("logError", logError);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const calls: number[] = [];
     const disposables = new Disposables();
     disposables.add(() => calls.push(1));
@@ -34,8 +33,8 @@ describe("Disposables", () => {
     expect(() => disposables.dispose()).not.toThrow();
 
     expect(calls).toEqual([3, 1]);
-    expect(logError).toHaveBeenCalledOnce();
-    expect(logError.mock.calls[0][1]).toBe(
+    expect(errSpy).toHaveBeenCalledOnce();
+    expect(errSpy.mock.calls[0][1]).toBe(
       "err(disposables): error during teardown | teardown failed",
     );
   });

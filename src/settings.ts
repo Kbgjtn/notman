@@ -101,7 +101,7 @@ export function parseAppRules(raw: string): AppRuleEntry[] {
       if (!match) continue;
       rules.push({
         match,
-        muted: Boolean(rec.muted),
+        muted: rec.muted === true,
         maxCount: clampRange(rec.maxCount ?? 0, 0, 100),
         expireSeconds: clampRange(rec.expireSeconds ?? 0, 0, 3600),
       });

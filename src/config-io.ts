@@ -1,9 +1,6 @@
-import {
-  parseAppRules,
-  parseIndicatorPosition,
-  parseThumbnailMode,
-  SettingKey,
-} from "./settings.js";
+import { formatTimeMinutes, parseTimeMinutes } from "./quiet-hours.js";
+import { parseAppRules, SettingKey } from "./settings.js";
+import { IndicatorPosition, ThumbnailMode } from "./types.js";
 
 export interface SettingsBackend {
   get_boolean(key: string): boolean;
@@ -48,7 +45,8 @@ const STRING_KEYS: readonly SettingKey[] = [
   SettingKey.QuietHoursEnd,
 ];
 
-const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const VALID_THUMBNAIL_MODES = new Set<string>(Object.values(ThumbnailMode));
+const VALID_INDICATOR_POSITIONS = new Set<string>(Object.values(IndicatorPosition));
 
 export function exportSettingsJson(backend: SettingsBackend): string {
   const data: Record<string, boolean | number | string> = {};
@@ -63,8 +61,10 @@ export function importSettingsJson(raw: string, backend: SettingsBackend): numbe
   if (
     !parsed ||
     typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
     !parsed.settings ||
-    typeof parsed.settings !== "object"
+    typeof parsed.settings !== "object" ||
+    Array.isArray(parsed.settings)
   ) {
     throw new Error("Invalid Notman settings file");
   }
@@ -86,32 +86,36 @@ export function importSettingsJson(raw: string, backend: SettingsBackend): numbe
     }
   }
 
-  if (typeof src[SettingKey.ScreenshotThumbnailMode] === "string") {
-    backend.set_string(
-      SettingKey.ScreenshotThumbnailMode,
-      parseThumbnailMode(src[SettingKey.ScreenshotThumbnailMode]),
-    );
+  const modeVal = src[SettingKey.ScreenshotThumbnailMode];
+  if (typeof modeVal === "string" && VALID_THUMBNAIL_MODES.has(modeVal)) {
+    backend.set_string(SettingKey.ScreenshotThumbnailMode, modeVal);
     applied++;
   }
-  if (typeof src[SettingKey.IndicatorPosition] === "string") {
-    backend.set_string(
-      SettingKey.IndicatorPosition,
-      parseIndicatorPosition(src[SettingKey.IndicatorPosition]),
-    );
+  const posVal = src[SettingKey.IndicatorPosition];
+  if (typeof posVal === "string" && VALID_INDICATOR_POSITIONS.has(posVal)) {
+    backend.set_string(SettingKey.IndicatorPosition, posVal);
     applied++;
   }
-  if (typeof src[SettingKey.AppRules] === "string") {
-    backend.set_string(
-      SettingKey.AppRules,
-      JSON.stringify(parseAppRules(src[SettingKey.AppRules])),
-    );
-    applied++;
+  const rulesRaw = src[SettingKey.AppRules];
+  if (typeof rulesRaw === "string") {
+    try {
+      const parsedRules = JSON.parse(rulesRaw);
+      if (Array.isArray(parsedRules)) {
+        backend.set_string(SettingKey.AppRules, JSON.stringify(parseAppRules(rulesRaw)));
+        applied++;
+      }
+    } catch {
+      // Ignore malformed app-rules JSON instead of clobbering existing rules.
+    }
   }
   for (const timeKey of [SettingKey.QuietHoursStart, SettingKey.QuietHoursEnd]) {
     const val = src[timeKey];
-    if (typeof val === "string" && TIME_PATTERN.test(val.trim())) {
-      backend.set_string(timeKey, val.trim());
-      applied++;
+    if (typeof val === "string") {
+      const minutes = parseTimeMinutes(val);
+      if (minutes !== null) {
+        backend.set_string(timeKey, formatTimeMinutes(Math.floor(minutes / 60), minutes % 60));
+        applied++;
+      }
     }
   }
 
