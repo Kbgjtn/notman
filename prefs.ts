@@ -261,8 +261,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     generalPage.add(generalGroup);
 
     const topBarGroup = new Adw.PreferencesGroup({
-      title: _("Top bar"),
-      description: _("Add a quick menu and live counter to the top bar."),
+      title: _("Tray"),
+      description: _("Show a quick menu and live counter in the top bar."),
     });
     addHeaderSwitch(topBarGroup, SettingKey.ShowIndicator);
 
@@ -272,7 +272,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     positions.append(_("Right"));
     const positionRow = new Adw.ComboRow({
       title: _("Position"),
-      subtitle: _("Where the icon sits in the top bar."),
+      subtitle: _("Side of the top bar."),
       model: positions,
     });
     const readPositionIndex = (): number => {
@@ -296,7 +296,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
       topBarGroup,
       SettingKey.IndicatorIndex,
       _("Order"),
-      _("Fine-tune the icon's placement within that section."),
+      _("Placement inside that side."),
       0,
       20,
       1,
