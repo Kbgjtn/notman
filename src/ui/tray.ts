@@ -307,18 +307,21 @@ export class TrayIndicator {
       });
       const footer = new St.BoxLayout({
         x_align: Clutter.ActorAlign.CENTER,
-        layout_manager: new Clutter.BoxLayout({ spacing: 4 }),
+        y_align: Clutter.ActorAlign.CENTER,
+        style: "margin-top: 2px;",
       });
       footer.add_child(
         new St.Icon({
           icon_name: iconName,
           icon_size: 12,
+          y_align: Clutter.ActorAlign.CENTER,
           style_class: "notman-stat-icon",
         }),
       );
       footer.add_child(
         new St.Label({
           text: caption,
+          y_align: Clutter.ActorAlign.CENTER,
           style_class: "notman-stat-label",
         }),
       );
