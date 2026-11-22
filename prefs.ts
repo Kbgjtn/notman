@@ -33,29 +33,24 @@ const PREFS_CSS = `
   background-color: alpha(@accent_bg_color, 0.16);
   border-color: @accent_bg_color;
 }
-.notman-stat-card {
+.notman-stat-box {
   border-radius: 12px;
-  border: 1px solid alpha(@window_fg_color, 0.1);
+  border: 1px solid alpha(@window_fg_color, 0.12);
   background-color: @card_bg_color;
-  padding: 14px 10px;
+  padding: 14px 0;
 }
-.notman-stat-active {
-  background-color: rgba(56, 189, 248, 0.1);
-  border-color: rgba(56, 189, 248, 0.28);
+.notman-stat-col {
+  padding: 0 12px;
+  border-right: 1px solid alpha(@window_fg_color, 0.1);
+}
+.notman-stat-col-last {
+  border-right: none;
 }
 .notman-stat-active .notman-stat-accent {
   color: #38bdf8;
 }
-.notman-stat-cleaned {
-  background-color: rgba(251, 191, 36, 0.1);
-  border-color: rgba(251, 191, 36, 0.28);
-}
 .notman-stat-cleaned .notman-stat-accent {
   color: #fbbf24;
-}
-.notman-stat-saved {
-  background-color: rgba(52, 211, 153, 0.1);
-  border-color: rgba(52, 211, 153, 0.28);
 }
 .notman-stat-saved .notman-stat-accent {
   color: #34d399;
@@ -235,13 +230,21 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const statsGrid = new Gtk.Box({
       orientation: Gtk.Orientation.HORIZONTAL,
       homogeneous: true,
-      spacing: 10,
+      spacing: 0,
+      css_classes: ["notman-stat-box"],
     });
-    const makeStatTile = (caption: string, iconName: string, toneClass: string): Gtk.Label => {
+    const makeStatTile = (
+      caption: string,
+      iconName: string,
+      toneClass: string,
+      isLast = false,
+    ): Gtk.Label => {
       const tile = new Gtk.Box({
         orientation: Gtk.Orientation.VERTICAL,
         spacing: 6,
-        css_classes: ["notman-stat-card", toneClass],
+        css_classes: isLast
+          ? ["notman-stat-col", "notman-stat-col-last", toneClass]
+          : ["notman-stat-col", toneClass],
       });
       const value = new Gtk.Label({
         label: "—",
@@ -272,7 +275,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     };
     const activeVal = makeStatTile(_("Active"), "go-up-symbolic", "notman-stat-active");
     const cleanedVal = makeStatTile(_("Cleaned"), "go-down-symbolic", "notman-stat-cleaned");
-    const savedVal = makeStatTile(_("RAM saved"), "emblem-ok-symbolic", "notman-stat-saved");
+    const savedVal = makeStatTile(_("RAM saved"), "emblem-ok-symbolic", "notman-stat-saved", true);
     statusGroup.add(statsGrid);
     generalPage.add(statusGroup);
 

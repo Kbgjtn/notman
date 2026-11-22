@@ -36,28 +36,19 @@
 
 .notman-stats-card {
   min-width: 248px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 0;
 }
 
 .notman-stat-tile {
-  border-radius: 9px;
-  padding: 7px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background-color: rgba(255, 255, 255, 0.04);
+  padding: 2px 6px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.notman-stat-active {
-  background-color: rgba(56, 189, 248, 0.1);
-  border-color: rgba(56, 189, 248, 0.24);
-}
-
-.notman-stat-cleaned {
-  background-color: rgba(251, 191, 36, 0.1);
-  border-color: rgba(251, 191, 36, 0.24);
-}
-
-.notman-stat-saved {
-  background-color: rgba(52, 211, 153, 0.1);
-  border-color: rgba(52, 211, 153, 0.24);
+.notman-stat-tile-last {
+  border-right: none;
 }
 
 .notman-stat-value {
@@ -67,7 +58,7 @@
 
 .notman-stat-label {
   font-size: 0.76em;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .notman-stat-active .notman-stat-value,

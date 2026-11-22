@@ -280,15 +280,22 @@ export class TrayIndicator {
       x_expand: true,
       x_align: Clutter.ActorAlign.FILL,
       style_class: "notman-stats-card",
-      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 6 }),
+      layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 0 }),
     });
 
-    const makeCol = (caption: string, iconName: string, toneClass: string): St.Label => {
+    const makeCol = (
+      caption: string,
+      iconName: string,
+      toneClass: string,
+      isLast = false,
+    ): St.Label => {
       const col = new St.BoxLayout({
         vertical: true,
         x_expand: true,
         x_align: Clutter.ActorAlign.FILL,
-        style_class: `notman-stat-tile ${toneClass}`,
+        style_class: isLast
+          ? `notman-stat-tile notman-stat-tile-last ${toneClass}`
+          : `notman-stat-tile ${toneClass}`,
       });
       const value = new St.Label({
         text: "0",
@@ -320,7 +327,7 @@ export class TrayIndicator {
 
     const activeValue = makeCol(_("Active"), "go-up-symbolic", "notman-stat-active");
     const cleanedValue = makeCol(_("Cleaned"), "go-down-symbolic", "notman-stat-cleaned");
-    const savedValue = makeCol(_("Saved"), "emblem-ok-symbolic", "notman-stat-saved");
+    const savedValue = makeCol(_("Saved"), "emblem-ok-symbolic", "notman-stat-saved", true);
 
     row.add_child(card);
     this._indicator.menu.addMenuItem(row);
