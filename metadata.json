@@ -5,5 +5,5 @@
   "url": "https://github.com/Kbgjtn/notman",
   "gettext-domain": "notman",
   "settings-schema": "org.gnome.shell.extensions.notman",
-  "shell-version": ["46", "47", "48"]
+  "shell-version": ["46", "47", "48", "49", "50", "51"]
 }

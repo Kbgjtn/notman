@@ -1,5 +1,7 @@
 export const SCREENSHOT_ICON = "screenshot-recorded-symbolic";
 export const SCREENCAST_ICON = "screencast-recorded-symbolic";
+/** GNOME 49+ uses one shared source for both screenshots and screencasts. */
+export const SCREEN_CAPTURE_ICON = "screenshooter-symbolic";
 
 /** Matches GNOME MessageTray.Source icon names across iconName and Gio.ThemedIcon. */
 export function hasSourceIcon(source: unknown, iconName: string): boolean {

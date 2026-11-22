@@ -7,6 +7,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { estimateContentBytes } from "./byte-estimate.js";
 import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
+import { hasSourceIcon, SCREEN_CAPTURE_ICON } from "./compat/source-match.js";
 import type { Disposables } from "./disposables.js";
 import { log } from "./log.js";
 import { type NotificationHandle, type SignalEmitter, SourceKey } from "./types.js";
@@ -160,6 +161,13 @@ export class ShellBridge implements Bridge {
   sourceKeyFor(notification: unknown): SourceKey {
     if (!notification || typeof notification !== "object") return SourceKey.Other;
     const source = (notification as { source?: unknown }).source;
+    if (this._adapter.mergedCaptureSource && hasSourceIcon(source, SCREEN_CAPTURE_ICON)) {
+      // GNOME 49+ merges both capture types into one source. Screenshot
+      // notifications carry an image gicon; screencast notifications do not.
+      return (notification as { gicon?: unknown }).gicon
+        ? SourceKey.Screenshot
+        : SourceKey.Screencast;
+    }
     if (this._adapter.isScreenshotSource(source)) return SourceKey.Screenshot;
     if (this._adapter.isScreencastSource(source)) return SourceKey.Screencast;
     return SourceKey.Other;
