@@ -24,11 +24,14 @@
       <default>'full'</default>
       <choices>
         <choice value='full'/>
+        <choice value='compact'/>
         <choice value='text-only'/>
       </choices>
       <summary>Screenshot thumbnail mode</summary>
       <description>
         "full" keeps the full-resolution image in the notification.
+        "compact" replaces it with a downscaled preview thumbnail (~128 px),
+        reducing memory usage while preserving a visual preview.
         "text-only" replaces it with a small themed icon, releasing the
         full-size texture while keeping the notification text and actions.
       </description>

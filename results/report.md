@@ -11,6 +11,7 @@ RSS deltas in kB; negative medians are GC/scheduling noise, not reclaimed memory
 | cap | 1920x1080 | 2 | 144 | -352 | 8 | 63.3 |
 | cap | 2560x1440 | 2 | 262762 | 165406 | 8 | 112.5 |
 | combined | 2560x1440 | 2 | 266714 | 7188 | 3 | 42.2 |
+| compact | 2560x1440 | 2 | 442934 | 96818 | 10 | 0.4 |
 | drop | 1280x720 | 2 | 76 | -113581 | 0 | 0.0 |
 | drop | 1920x1080 | 2 | 144 | -367 | 0 | 0.0 |
 | drop | 2560x1440 | 2 | 188418 | 32996 | 0 | 0.0 |

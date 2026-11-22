@@ -109,3 +109,39 @@ else
   echo "QA FAIL: screenshot was not tracked (activeCount=${COUNT:-none})" >&2
   exit 1
 fi
+
+echo "--- compact thumbnail mode ---"
+gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
+  --object-path /org/gnome/Shell/Extensions/Notman \
+  --method org.gnome.Shell.Extensions.Notman.ClearScreenshots >/dev/null
+gsettings set org.gnome.shell.extensions.notman screenshot-thumbnail-mode compact
+sleep 1
+xdotool key --clearmodifiers shift+Print
+sleep 2
+
+COMPACT_STATS="$(gdbus call --session --dest org.gnome.Shell.Extensions.Notman \
+  --object-path /org/gnome/Shell/Extensions/Notman \
+  --method org.gnome.Shell.Extensions.Notman.GetStats)"
+echo "$COMPACT_STATS"
+
+COMPACT_COUNT="$(echo "$COMPACT_STATS" | grep -o "activeCount': <[0-9]*>" | grep -o '[0-9]*' || true)"
+COMPACT_BYTES="$(echo "$COMPACT_STATS" | sed -n "s/.*'estimatedBytes': <int64 \([0-9]*\)>.*/\1/p")"
+if [ "${COMPACT_COUNT:-0}" -le 0 ]; then
+  echo "QA FAIL: compact screenshot was not tracked (activeCount=${COMPACT_COUNT:-none})" >&2
+  exit 1
+fi
+if [ "${COMPACT_BYTES:-0}" -le 0 ] || [ "${COMPACT_BYTES:-0}" -ge 100000 ]; then
+  echo "QA FAIL: expected 0 < estimatedBytes < 100000 in compact mode (got ${COMPACT_BYTES:-none})" >&2
+  grep -iE 'notman|compact|bridge' "$QA_TMP/shell.log" | tail -30 || true
+  exit 1
+fi
+echo "QA OK: compact thumbnail tracked (activeCount=$COMPACT_COUNT, estimatedBytes=$COMPACT_BYTES)"
+
+ERRORS="$(gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
+  --method org.gnome.Shell.Extensions.GetExtensionErrors notman@ozy.local)"
+echo "--- extension errors (final) ---"
+echo "$ERRORS"
+if [ "$ERRORS" != "(@as [],)" ]; then
+  echo "QA FAIL: extension reported errors: $ERRORS" >&2
+  exit 1
+fi

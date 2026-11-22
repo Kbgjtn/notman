@@ -101,8 +101,15 @@ export class Engine {
         const outcome = rule.evaluate(handles, context);
         log.debug(
           "engine",
-          `rule ${rule.id}: tracked=${handles.length} destroy=${outcome.destroy.length} downgrade=${outcome.downgrade.length}`,
+          `rule ${rule.id}: tracked=${handles.length} destroy=${outcome.destroy.length} compact=${outcome.compact.length} downgrade=${outcome.downgrade.length}`,
         );
+        for (const handle of outcome.compact) {
+          try {
+            handle.compact();
+          } catch (e) {
+            log.err("engine", `rule ${rule.id} compact failed`, e);
+          }
+        }
         for (const handle of outcome.downgrade) {
           try {
             handle.downgrade();
@@ -135,6 +142,7 @@ export class Engine {
   }
 
   getStats(): StatsSnapshot {
+    this._stats.update([...this._handles.values()]);
     this._stats.setRss(this._bridge.readRssBytes());
     return this._stats.snapshot();
   }

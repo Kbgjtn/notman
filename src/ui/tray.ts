@@ -9,8 +9,8 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { formatMiB } from "../byte-estimate.js";
 import type { Engine } from "../engine.js";
 import { log } from "../log.js";
-import { SettingKey, switchToThumbnailMode, thumbnailModeToSwitch } from "../settings.js";
-import type { SignalEmitter } from "../types.js";
+import { parseThumbnailMode, SettingKey } from "../settings.js";
+import { type SignalEmitter, ThumbnailMode } from "../types.js";
 
 type SwitchItem = SignalEmitter & {
   state: boolean;
@@ -67,13 +67,7 @@ export class TrayIndicator {
       () => this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled),
       (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
     );
-    this.addSwitch(
-      _("Text-only thumbnails"),
-      SettingKey.ScreenshotThumbnailMode,
-      () => thumbnailModeToSwitch(this._settings.get_string(SettingKey.ScreenshotThumbnailMode)),
-      (value) =>
-        this._settings.set_string(SettingKey.ScreenshotThumbnailMode, switchToThumbnailMode(value)),
-    );
+    this.addThumbnailModeMenu();
 
     menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -174,6 +168,59 @@ export class TrayIndicator {
         // Settings may already be gone.
       }
     });
+  }
+
+  private addThumbnailModeMenu(): void {
+    const submenu = new PopupMenu.PopupSubMenuMenuItem(_("Thumbnails"));
+    const choices: Array<{
+      mode: ThumbnailMode;
+      shortLabel: string;
+      item: PopupMenu.PopupMenuItem;
+    }> = [
+      {
+        mode: ThumbnailMode.Full,
+        shortLabel: _("Full"),
+        item: new PopupMenu.PopupMenuItem(_("Full thumbnail")),
+      },
+      {
+        mode: ThumbnailMode.Compact,
+        shortLabel: _("Compact"),
+        item: new PopupMenu.PopupMenuItem(_("Compact thumbnail")),
+      },
+      {
+        mode: ThumbnailMode.TextOnly,
+        shortLabel: _("Text only"),
+        item: new PopupMenu.PopupMenuItem(_("Text only")),
+      },
+    ];
+
+    for (const choice of choices) {
+      choice.item.connect("activate", () => {
+        try {
+          this._settings.set_string(SettingKey.ScreenshotThumbnailMode, choice.mode);
+        } catch (e) {
+          log.err("tray", `could not update ${SettingKey.ScreenshotThumbnailMode}`, e);
+        }
+      });
+      submenu.menu.addMenuItem(choice.item);
+    }
+
+    const refresh = (): void => {
+      const current = parseThumbnailMode(
+        this._settings.get_string(SettingKey.ScreenshotThumbnailMode),
+      );
+      let activeLabel = _("Full");
+      for (const choice of choices) {
+        const isCurrent = choice.mode === current;
+        choice.item.setOrnament(isCurrent ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
+        if (isCurrent) activeLabel = choice.shortLabel;
+      }
+      submenu.label.text = `${_("Thumbnails")}: ${activeLabel}`;
+    };
+
+    refresh();
+    this.watchSetting(SettingKey.ScreenshotThumbnailMode, refresh);
+    this._indicator.menu.addMenuItem(submenu);
   }
 
   private addSwitch(

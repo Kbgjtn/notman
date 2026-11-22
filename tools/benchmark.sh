@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
     --confirm) CONFIRMED=1; shift ;;
     --help)
       echo "usage: benchmark.sh --case CASE --res WxH --runs N --shots N [--pin CPU] [--timeout S] --confirm"
-      echo "cases: leak, leak-dndoff, drop, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
+      echo "cases: leak, leak-dndoff, drop, compact, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;

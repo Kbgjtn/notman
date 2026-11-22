@@ -42,13 +42,17 @@ export function makeContext(
 
 export class FakeHandle implements NotificationHandle {
   destroyed = false;
+  compacted = false;
   downgraded = false;
   destroyCalls = 0;
+  compactCalls = 0;
   downgradeCalls = 0;
   private readonly _bytes: number;
+  private _compactBytes: number;
 
   get estimatedBytes(): number {
-    return this.downgraded ? 0 : this._bytes;
+    if (this.downgraded) return 0;
+    return this.compacted ? this._compactBytes : this._bytes;
   }
 
   constructor(
@@ -60,8 +64,25 @@ export class FakeHandle implements NotificationHandle {
     readonly forFeedback = false,
     readonly isTransient = true,
     readonly destroyThrows = false,
+    compactBytes = 36_864,
+    readonly compactThrows = false,
   ) {
     this._bytes = estimatedBytes;
+    this._compactBytes = compactBytes;
+  }
+
+  setCompactBytes(bytes: number): void {
+    this._compactBytes = bytes;
+  }
+
+  isCompacted(): boolean {
+    return this.compacted;
+  }
+
+  compact(): void {
+    this.compactCalls++;
+    if (this.compactThrows) throw new Error("compact failed");
+    this.compacted = true;
   }
 
   isDowngraded(): boolean {

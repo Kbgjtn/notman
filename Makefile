@@ -17,7 +17,7 @@ TIMEOUT ?= 90
 help:
 	@echo "Targets: build, check, lint, test, dev-install, install, pack, baseline, benchmark, report, qa-xvfb, clean"
 	@echo "benchmark: CONFIRM=1 RES=WxH [CASE=leak] [RUNS=2] [SHOTS=10] [PIN_CPU=2] [TIMEOUT=90]"
-	@echo "Cases: leak, leak-dndoff, drop, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
+	@echo "Cases: leak, leak-dndoff, drop, compact, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
 
 all: build
 

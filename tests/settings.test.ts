@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  SettingKey,
-  SettingsStore,
-  switchToThumbnailMode,
-  thumbnailModeToSwitch,
-} from "../src/settings.js";
+import { parseThumbnailMode, SettingKey, SettingsStore } from "../src/settings.js";
 import { type RuleSettings, ThumbnailMode } from "../src/types.js";
 
 function fakeBackend(settings: Record<string, unknown>) {
@@ -158,10 +153,19 @@ describe("SettingsStore", () => {
     expect(settings[SettingKey.ScreenshotMaxCount]).toBe(3);
   });
 
-  it("maps thumbnail mode to and from switch state", () => {
-    expect(thumbnailModeToSwitch(ThumbnailMode.TextOnly)).toBe(true);
-    expect(thumbnailModeToSwitch(ThumbnailMode.Full)).toBe(false);
-    expect(switchToThumbnailMode(true)).toBe(ThumbnailMode.TextOnly);
-    expect(switchToThumbnailMode(false)).toBe(ThumbnailMode.Full);
+  it("reads compact thumbnail mode from schema", () => {
+    const store = new SettingsStore(
+      fakeBackend({
+        [SettingKey.ScreenshotThumbnailMode]: ThumbnailMode.Compact,
+      }) as never,
+    );
+    expect(store.read().thumbnailMode).toBe(ThumbnailMode.Compact);
+  });
+
+  it("parses thumbnail modes cleanly with fallback to full", () => {
+    expect(parseThumbnailMode(ThumbnailMode.Full)).toBe(ThumbnailMode.Full);
+    expect(parseThumbnailMode(ThumbnailMode.Compact)).toBe(ThumbnailMode.Compact);
+    expect(parseThumbnailMode(ThumbnailMode.TextOnly)).toBe(ThumbnailMode.TextOnly);
+    expect(parseThumbnailMode("unexpected")).toBe(ThumbnailMode.Full);
   });
 });

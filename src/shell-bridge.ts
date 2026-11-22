@@ -1,5 +1,8 @@
+import Cogl from "gi://Cogl";
+import GdkPixbuf from "gi://GdkPixbuf";
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
+import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 import { estimateContentBytes } from "./byte-estimate.js";
@@ -7,6 +10,9 @@ import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
 import type { Disposables } from "./disposables.js";
 import { log } from "./log.js";
 import { type NotificationHandle, type SignalEmitter, SourceKey } from "./types.js";
+
+const COMPACT_MAX_SIDE = 128;
+const MAX_IN_FLIGHT_COMPACTIONS = 3;
 
 type TrayLike = SignalEmitter & { getSources(): unknown[] };
 
@@ -46,10 +52,15 @@ function decodeUtf8(bytes: Uint8Array): string {
 export class ShellBridge implements Bridge {
   private readonly _ids = new WeakMap<object, number>();
   private readonly _destroyed = new WeakSet<object>();
+  private readonly _compacted = new WeakSet<object>();
+  private readonly _compactBytes = new WeakMap<object, number>();
   private readonly _downgraded = new WeakSet<object>();
   private readonly _seenSources = new WeakSet<object>();
   private readonly _attachedNotifications = new WeakSet<object>();
   private readonly _pendingDestroys = new Set<number>();
+  private readonly _pendingCancellables = new Set<Gio.Cancellable>();
+  private readonly _cancellables = new WeakMap<object, Gio.Cancellable>();
+  private _inFlightCompactions = 0;
   private _nextId = 1;
   private _stopped = false;
   private _onAdded: ((notification: unknown) => void) | null = null;
@@ -125,12 +136,23 @@ export class ShellBridge implements Bridge {
       this._ids.set(target, id);
     }
 
-    const estimatedBytes = estimateContentBytes(target.gicon);
+    const initialBytes = estimateContentBytes(target.gicon);
     const isCritical = target.urgency === this._adapter.criticalUrgency();
     const downgraded = this._downgraded;
+    const compactBytes = this._compactBytes;
+    const downgrade = (): void => {
+      this.cancelCompaction(target);
+      if (this._downgraded.has(target)) return;
+      try {
+        target.gicon = new Gio.ThemedIcon({ name: "screenshot-recorded-symbolic" });
+        this._downgraded.add(target);
+      } catch (e) {
+        log.err("bridge", "could not downgrade thumbnail", e);
+      }
+    };
     log.debug(
       "bridge",
-      `handle id=${id} sourceKey=${sourceKey} bytes=${estimatedBytes} critical=${isCritical}`,
+      `handle id=${id} sourceKey=${sourceKey} bytes=${initialBytes} critical=${isCritical}`,
     );
 
     return {
@@ -138,22 +160,146 @@ export class ShellBridge implements Bridge {
       sourceKey,
       receivedAtMs: Date.now(),
       get estimatedBytes(): number {
-        return downgraded.has(target) ? 0 : estimatedBytes;
+        if (downgraded.has(target)) return 0;
+        return compactBytes.get(target) ?? initialBytes;
       },
       isCritical,
       forFeedback: Boolean(target.forFeedback),
-      isDowngraded: (): boolean => this._downgraded.has(target),
-      downgrade: (): void => {
-        if (this._downgraded.has(target)) return;
+      isCompacted: (): boolean => this._compacted.has(target),
+      compact: (): void => {
+        if (
+          this._compacted.has(target) ||
+          this._downgraded.has(target) ||
+          this._destroyed.has(target) ||
+          this._stopped
+        ) {
+          return;
+        }
+        this._compacted.add(target);
+        if (this._inFlightCompactions >= MAX_IN_FLIGHT_COMPACTIONS) {
+          log.debug(
+            "bridge",
+            `compact id=${id}: burst limit (${MAX_IN_FLIGHT_COMPACTIONS}) reached, falling back to text-only`,
+          );
+          downgrade();
+          return;
+        }
+        this._inFlightCompactions++;
+        let released = false;
+        const release = (): void => {
+          if (released) return;
+          released = true;
+          this._inFlightCompactions = Math.max(0, this._inFlightCompactions - 1);
+        };
         try {
-          target.gicon = new Gio.ThemedIcon({ name: "screenshot-recorded-symbolic" });
-          this._downgraded.add(target);
+          const clipboard = St.Clipboard.get_default();
+          clipboard.get_content(St.ClipboardType.CLIPBOARD, "image/png", (_clipboard, bytes) => {
+            if (this._stopped || this._destroyed.has(target) || this._downgraded.has(target)) {
+              release();
+              return;
+            }
+            if (!bytes || bytes.get_size() === 0) {
+              release();
+              log.debug(
+                "bridge",
+                `compact id=${id}: clipboard has no PNG, falling back to text-only`,
+              );
+              downgrade();
+              return;
+            }
+            try {
+              const stream = Gio.MemoryInputStream.new_from_bytes(bytes as never);
+              const cancellable = new Gio.Cancellable();
+              this._pendingCancellables.add(cancellable);
+              this._cancellables.set(target, cancellable);
+              GdkPixbuf.Pixbuf.new_from_stream_at_scale_async(
+                stream as never,
+                COMPACT_MAX_SIDE,
+                COMPACT_MAX_SIDE,
+                true,
+                cancellable as never,
+                (_source, result) => {
+                  this._pendingCancellables.delete(cancellable);
+                  if (this._cancellables.get(target) === cancellable) {
+                    this._cancellables.delete(target);
+                  }
+                  release();
+                  if (
+                    this._stopped ||
+                    this._destroyed.has(target) ||
+                    this._downgraded.has(target)
+                  ) {
+                    return;
+                  }
+                  try {
+                    const pixbuf = GdkPixbuf.Pixbuf.new_from_stream_finish(result);
+                    const width = pixbuf.get_width();
+                    const height = pixbuf.get_height();
+                    const hasAlpha = pixbuf.get_has_alpha();
+                    const rowstride = pixbuf.get_rowstride();
+                    const pixelBytes = pixbuf.read_pixel_bytes();
+                    const content = new St.ImageContent({
+                      preferred_width: width,
+                      preferred_height: height,
+                    });
+                    const pixelFormat = hasAlpha
+                      ? Cogl.PixelFormat.RGBA_8888
+                      : Cogl.PixelFormat.RGB_888;
+                    const ok = content.set_bytes(
+                      pixelBytes as never,
+                      pixelFormat,
+                      width,
+                      height,
+                      rowstride,
+                    );
+                    if (!ok) {
+                      log.debug(
+                        "bridge",
+                        `compact id=${id}: set_bytes returned false, falling back to text-only`,
+                      );
+                      downgrade();
+                      return;
+                    }
+                    target.gicon = content;
+                    const bytesEstimate = estimateContentBytes(content) || width * height * 4;
+                    this._compactBytes.set(target, bytesEstimate);
+                    log.debug(
+                      "bridge",
+                      `compacted id=${id} ${width}x${height} bytes=${bytesEstimate}`,
+                    );
+                  } catch (e) {
+                    if (cancellable.is_cancelled()) return;
+                    log.debug(
+                      "bridge",
+                      `compact id=${id}: decode failed, falling back to text-only (${String(e)})`,
+                    );
+                    downgrade();
+                  }
+                },
+              );
+            } catch (e) {
+              release();
+              log.debug(
+                "bridge",
+                `compact id=${id}: stream setup failed, falling back to text-only (${String(e)})`,
+              );
+              downgrade();
+            }
+          });
         } catch (e) {
-          log.err("bridge", "could not downgrade thumbnail", e);
+          release();
+          log.debug(
+            "bridge",
+            `compact id=${id}: clipboard read failed, falling back to text-only (${String(e)})`,
+          );
+          downgrade();
         }
       },
+      isDowngraded: (): boolean => this._downgraded.has(target),
+      downgrade,
       destroy: (): boolean => {
         if (this._destroyed.has(target) || this._stopped) return false;
+        this.cancelCompaction(target);
         log.debug("bridge", `destroy scheduled for id=${id}`);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           this._pendingDestroys.delete(sourceId);
@@ -195,6 +341,15 @@ export class ShellBridge implements Bridge {
     this._stopped = true;
     this._onAdded = null;
     this._onDestroyed = null;
+    this._inFlightCompactions = 0;
+    for (const cancellable of this._pendingCancellables) {
+      try {
+        cancellable.cancel();
+      } catch {
+        // Already completed.
+      }
+    }
+    this._pendingCancellables.clear();
     for (const id of this._pendingDestroys) {
       try {
         GLib.source_remove(id);
@@ -203,6 +358,18 @@ export class ShellBridge implements Bridge {
       }
     }
     this._pendingDestroys.clear();
+  }
+
+  private cancelCompaction(target: object): void {
+    const cancellable = this._cancellables.get(target);
+    if (!cancellable) return;
+    this._cancellables.delete(target);
+    this._pendingCancellables.delete(cancellable);
+    try {
+      cancellable.cancel();
+    } catch {
+      // Already completed.
+    }
   }
 
   private attachNotification(notification: unknown): void {
@@ -223,6 +390,8 @@ export class ShellBridge implements Bridge {
     );
 
     const signalId = emitter.connect(this._adapter.signals.destroy, () => {
+      this._destroyed.add(notification);
+      this.cancelCompaction(notification);
       this._disposables.remove(dispose);
       onDestroyed(notification);
     });

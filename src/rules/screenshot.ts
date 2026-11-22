@@ -49,14 +49,25 @@ export class ScreenshotRule implements Rule {
     }
 
     const willDowngradeAll = settings.thumbnailMode === ThumbnailMode.TextOnly;
+    const willCompactNew = settings.thumbnailMode === ThumbnailMode.Compact;
     if (settings.memoryBudgetMb > 0 && !willDowngradeAll) {
       const limit = settings.memoryBudgetMb * MiB;
       const surviving = oldestFirst.filter((h) => !destroySet.has(h));
-      let total = surviving.reduce((sum, h) => sum + h.estimatedBytes, 0);
+      const effectiveBytes = (h: NotificationHandle): number =>
+        willCompactNew && !h.isCompacted() && !h.isDowngraded() ? 0 : h.estimatedBytes;
+      let total = surviving.reduce((sum, h) => sum + effectiveBytes(h), 0);
       for (const handle of surviving) {
         if (total <= limit) break;
         destroySet.add(handle);
-        total -= handle.estimatedBytes;
+        total -= effectiveBytes(handle);
+      }
+    }
+
+    if (willCompactNew) {
+      for (const handle of oldestFirst) {
+        if (!destroySet.has(handle) && !handle.isCompacted() && !handle.isDowngraded()) {
+          outcome.compact.push(handle);
+        }
       }
     }
 

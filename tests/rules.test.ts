@@ -70,6 +70,85 @@ describe("ScreenshotRule", () => {
     expect(outcome.downgrade).toEqual([]);
   });
 
+  it("compacts thumbnails in compact mode", () => {
+    const shot = new FakeHandle(1, SourceKey.Screenshot, 0, 32 * MiB);
+    const outcome = rule.evaluate(
+      [shot],
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact })),
+    );
+    expect(outcome.compact).toEqual([shot]);
+    expect(outcome.downgrade).toEqual([]);
+  });
+
+  it("does not re-compact an already compacted or downgraded handle", () => {
+    const compacted = new FakeHandle(1, SourceKey.Screenshot, 0, 32 * MiB);
+    compacted.compact();
+    const downgraded = new FakeHandle(2, SourceKey.Screenshot, 10, 32 * MiB);
+    downgraded.downgrade();
+    const outcome = rule.evaluate(
+      [compacted, downgraded],
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact })),
+    );
+    expect(outcome.compact).toEqual([]);
+  });
+
+  it("does not compact handles that are already scheduled for destruction", () => {
+    const handles = [
+      new FakeHandle(1, SourceKey.Screenshot, 10, 32 * MiB),
+      new FakeHandle(2, SourceKey.Screenshot, 20, 32 * MiB),
+    ];
+    const outcome = rule.evaluate(
+      handles,
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact, maxCount: 1 })),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1]);
+    expect(outcome.compact.map((h) => h.id)).toEqual([2]);
+  });
+
+  it("does not over-prune for the budget when thumbnails will be compacted", () => {
+    const handles = [1, 2, 3].map((id) => new FakeHandle(id, SourceKey.Screenshot, id, 32 * MiB));
+    const outcome = rule.evaluate(
+      handles,
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact, memoryBudgetMb: 1 })),
+    );
+    expect(outcome.compact).toHaveLength(3);
+    expect(outcome.destroy).toEqual([]);
+  });
+
+  it("enforces memory budget across already-compacted handles using their compact size", () => {
+    const handles = [1, 2, 3].map((id) => {
+      const h = new FakeHandle(
+        id,
+        SourceKey.Screenshot,
+        id,
+        32 * MiB,
+        false,
+        false,
+        true,
+        false,
+        600 * 1024,
+      );
+      h.compact();
+      return h;
+    });
+    const outcome = rule.evaluate(
+      handles,
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.Compact, memoryBudgetMb: 1 })),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1, 2]);
+    expect(outcome.compact).toEqual([]);
+  });
+
+  it("downgrades previously compacted handles when switched to text-only mode", () => {
+    const shot = new FakeHandle(1, SourceKey.Screenshot, 0, 32 * MiB);
+    shot.compact();
+    const outcome = rule.evaluate(
+      [shot],
+      makeContext(makeSettings({ thumbnailMode: ThumbnailMode.TextOnly })),
+    );
+    expect(outcome.downgrade).toEqual([shot]);
+  });
+
   it("destroys oldest notifications beyond max-count", () => {
     const handles = [
       new FakeHandle(1, SourceKey.Screenshot, 10),

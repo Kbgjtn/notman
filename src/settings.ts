@@ -36,12 +36,10 @@ const RULE_KEYS = new Set<string>([
   SettingKey.EmergencyHardCap,
 ]);
 
-export function thumbnailModeToSwitch(mode: string): boolean {
-  return mode === ThumbnailMode.TextOnly;
-}
-
-export function switchToThumbnailMode(textOnly: boolean): ThumbnailMode {
-  return textOnly ? ThumbnailMode.TextOnly : ThumbnailMode.Full;
+export function parseThumbnailMode(raw: string): ThumbnailMode {
+  if (raw === ThumbnailMode.Compact) return ThumbnailMode.Compact;
+  if (raw === ThumbnailMode.TextOnly) return ThumbnailMode.TextOnly;
+  return ThumbnailMode.Full;
 }
 
 function clampMaxCount(value: number): number {
@@ -109,8 +107,7 @@ export class SettingsStore {
     } catch (e) {
       this.warn(SettingKey.ScreenshotThumbnailMode, e);
     }
-    const thumbnailMode =
-      rawMode === ThumbnailMode.TextOnly ? ThumbnailMode.TextOnly : ThumbnailMode.Full;
+    const thumbnailMode = parseThumbnailMode(rawMode);
     const snapshot: RuleSettings = {
       guardEnabled: this.getBoolean(SettingKey.GuardEnabled, DEFAULTS.guardEnabled),
       notifyEnabled: this.getBoolean(SettingKey.ScreenshotNotifyEnabled, DEFAULTS.notifyEnabled),

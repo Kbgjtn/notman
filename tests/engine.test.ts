@@ -246,6 +246,84 @@ describe("Engine", () => {
     expect(engine.getStats().estimatedBytes).toBe(0);
   });
 
+  it("compacts thumbnails on arrival in compact mode and reports compact bytes", () => {
+    const handle = new FakeHandle(1, SourceKey.Screenshot, 0, 32 * 1024 * 1024);
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ thumbnailMode: ThumbnailMode.Compact })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(notification);
+
+    expect(handle.compacted).toBe(true);
+    expect(handle.compactCalls).toBe(1);
+    expect(engine.getStats().estimatedBytes).toBe(36_864);
+    expect(engine.getStats().estimatedBytes).toBeLessThan(100_000);
+  });
+
+  it("reflects updated bytes in getStats() after async compaction finishes", () => {
+    const handle = new FakeHandle(
+      1,
+      SourceKey.Screenshot,
+      0,
+      32 * 1024 * 1024,
+      false,
+      false,
+      true,
+      false,
+      32 * 1024 * 1024,
+    );
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ thumbnailMode: ThumbnailMode.Compact })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(notification);
+    expect(handle.compacted).toBe(true);
+
+    // Simulate async clipboard decode completing with compact size.
+    handle.setCompactBytes(40_960);
+    expect(engine.getStats().estimatedBytes).toBe(40_960);
+  });
+
+  it("does not panic when compact throws", () => {
+    const handle = new FakeHandle(
+      1,
+      SourceKey.Screenshot,
+      0,
+      1024,
+      false,
+      false,
+      true,
+      false,
+      36_864,
+      true,
+    );
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ thumbnailMode: ThumbnailMode.Compact })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    expect(() => engine.onNotificationAdded(notification)).not.toThrow();
+    expect(handle.compactCalls).toBe(1);
+    expect(engine.getStats().activeCount).toBe(1);
+  });
+
   it("adopts notifications via bridge.adoptExisting during sweep", () => {
     const handle = new FakeHandle(1, SourceKey.Screenshot, 0);
     const notification = {};

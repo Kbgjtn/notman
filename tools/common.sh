@@ -89,6 +89,10 @@ set_case_settings() {
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-notify-enabled false
       ;;
+    compact)
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-thumbnail-mode "'compact'"
+      ;;
     text)
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-thumbnail-mode "'text-only'"

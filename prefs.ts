@@ -9,8 +9,14 @@ import {
 
 import { formatMiB } from "./src/byte-estimate.js";
 import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
-import { SettingKey } from "./src/settings.js";
+import { parseThumbnailMode, SettingKey } from "./src/settings.js";
 import { ThumbnailMode } from "./src/types.js";
+
+const THUMBNAIL_MODES: readonly ThumbnailMode[] = [
+  ThumbnailMode.Full,
+  ThumbnailMode.Compact,
+  ThumbnailMode.TextOnly,
+];
 
 interface LiveStats {
   readonly activeCount: number;
@@ -107,7 +113,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
       icon_name: "screenshot-recorded-symbolic",
     });
 
-    // --- Status ---
     const statusGroup = new Adw.PreferencesGroup({
       title: _("Status"),
     });
@@ -145,7 +150,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
       return GLib.SOURCE_CONTINUE;
     });
 
-    // --- General ---
     const generalGroup = new Adw.PreferencesGroup({
       title: _("General"),
     });
@@ -169,7 +173,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
     );
     page.add(generalGroup);
 
-    // --- Screenshot notifications ---
     const rulesGroup = new Adw.PreferencesGroup({
       title: _("Screenshot notifications"),
       description: _("Zero disables an individual limit."),
@@ -185,20 +188,23 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const modes = new Gtk.StringList({});
     modes.append(_("Full thumbnail"));
+    modes.append(_("Compact thumbnail"));
     modes.append(_("Text only"));
     const modeRow = new Adw.ComboRow({
       title: _("Thumbnail mode"),
-      subtitle: _("Text only releases the full-resolution image immediately."),
+      subtitle: _(
+        "Compact downscales previews to save memory; text only removes the image immediately.",
+      ),
       model: modes,
     });
-    const readModeIndex = (): number =>
-      settings.get_string(SettingKey.ScreenshotThumbnailMode) === ThumbnailMode.TextOnly ? 1 : 0;
+    const readModeIndex = (): number => {
+      const current = parseThumbnailMode(settings.get_string(SettingKey.ScreenshotThumbnailMode));
+      return Math.max(0, THUMBNAIL_MODES.indexOf(current));
+    };
     modeRow.selected = readModeIndex();
     modeRow.connect("notify::selected", () => {
-      settings.set_string(
-        SettingKey.ScreenshotThumbnailMode,
-        modeRow.selected === 1 ? ThumbnailMode.TextOnly : ThumbnailMode.Full,
-      );
+      const mode = THUMBNAIL_MODES[modeRow.selected] ?? ThumbnailMode.Full;
+      settings.set_string(SettingKey.ScreenshotThumbnailMode, mode);
     });
     signalIds.push(
       settings.connect(`changed::${SettingKey.ScreenshotThumbnailMode}`, () => {
@@ -246,7 +252,6 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }
     page.add(rulesGroup);
 
-    // --- Advanced ---
     const advancedGroup = new Adw.PreferencesGroup({
       title: _("Advanced"),
     });

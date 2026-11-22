@@ -1,5 +1,6 @@
 export enum ThumbnailMode {
   Full = "full",
+  Compact = "compact",
   TextOnly = "text-only",
 }
 
@@ -35,6 +36,8 @@ export interface NotificationHandle {
   readonly estimatedBytes: number;
   readonly isCritical: boolean;
   readonly forFeedback: boolean;
+  isCompacted(): boolean;
+  compact(): void;
   isDowngraded(): boolean;
   downgrade(): void;
   destroy(): boolean;
@@ -48,6 +51,7 @@ export interface RuleContext {
 
 export interface RuleOutcome {
   destroy: NotificationHandle[];
+  compact: NotificationHandle[];
   downgrade: NotificationHandle[];
 }
 
@@ -56,4 +60,4 @@ export interface Rule {
   evaluate(handles: NotificationHandle[], context: RuleContext): RuleOutcome;
 }
 
-export const emptyOutcome = (): RuleOutcome => ({ destroy: [], downgrade: [] });
+export const emptyOutcome = (): RuleOutcome => ({ destroy: [], compact: [], downgrade: [] });

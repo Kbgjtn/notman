@@ -119,8 +119,8 @@ disabled for the duration of a run, so your Pictures directory is not touched;
 the shell still creates the notification and its full-size thumbnail. All
 settings, display mode and refresh rate are restored on exit. Cases are `leak`
 (reference, guard off), `leak-dndoff` and `text-dndoff` (controls), `drop`,
-`text`, `limit`, `expire`, `budget`, `cap`, `combined` (all defaults at once)
-and `unlimited` (no limits). The DND-off cases are controls only: banners add
+`compact` (~128 px downscaled thumbnails), `text`, `limit`, `expire`, `budget`,
+`cap`, `combined` (all defaults at once) and `unlimited` (no limits). The DND-off cases are controls only: banners add
 compositor noise and the three-entry banner queue still leaks the overflow, so
 they are not the comparison baseline. Runs must be approved before execution.
 
