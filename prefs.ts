@@ -307,7 +307,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     generalPage.add(topBarGroup);
 
     const screenshotsPage = new Adw.PreferencesPage({
-      title: _("Screenshots"),
+      title: _("Captures"),
       icon_name: "camera-photo-symbolic",
     });
 
