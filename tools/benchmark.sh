@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
     --confirm) CONFIRMED=1; shift ;;
     --help)
       echo "usage: benchmark.sh --case CASE --res WxH --runs N --shots N [--pin CPU] [--timeout S] --confirm"
-      echo "cases: leak, leak-dndoff, drop, text, limit, expire, budget, cap"
+      echo "cases: leak, leak-dndoff, drop, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
       exit 0
       ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -66,9 +66,14 @@ echo "case=$CASE res=${RES:-native} runs=$RUNS shots=$SHOTS pin=$PIN_CPU timeout
 echo "dnd_show_banners=$(gsettings get org.gnome.desktop.notifications show-banners)"
 
 for ((run = 1; run <= RUNS; run++)); do
-  OUT="results/${CASE}-${RES:-native}-${run}.csv"
+  if [ "$SHOTS" -eq 10 ]; then
+    CASE_TAG="$CASE"
+  else
+    CASE_TAG="${CASE}-${SHOTS}shots"
+  fi
+  OUT="results/${CASE_TAG}-${RES:-native}-${run}.csv"
   {
-    echo "# case=$CASE res=${RES:-native} run=$run"
+    echo "# case=$CASE_TAG res=${RES:-native} run=$run"
     echo "# shell_pid=$SHELL_PID pin=$PIN_CPU timeout=$TIMEOUT_S"
     echo "# dnd_show_banners=$(gsettings get org.gnome.desktop.notifications show-banners)"
     echo "# save_to_disk=false"

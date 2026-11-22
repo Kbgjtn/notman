@@ -109,14 +109,34 @@ set_case_settings() {
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-memory-budget-mb 0
       gsettings set "$NOTMAN_SETTINGS_SCHEMA" emergency-hard-cap 8
       ;;
+    combined)
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-max-count 3
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-expire-seconds 15
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-memory-budget-mb 64
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" emergency-hard-cap 64
+      ;;
+    unlimited)
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-max-count 0
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-expire-seconds 0
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-memory-budget-mb 0
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" emergency-hard-cap 0
+      ;;
+    text-dndoff)
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" guard-enabled true
+      gsettings set "$NOTMAN_SETTINGS_SCHEMA" screenshot-thumbnail-mode "'text-only'"
+      ;;
     *)
       echo "unknown case: $case" >&2
       return 1
       ;;
   esac
-  if [ "$case" = "leak-dndoff" ]; then
-    gsettings set "$NOTMAN_DESKTOP_SCHEMA" show-banners true
-  fi
+  case "$case" in
+    leak-dndoff|text-dndoff)
+      gsettings set "$NOTMAN_DESKTOP_SCHEMA" show-banners true
+      ;;
+  esac
 }
 
 primary_output() {
