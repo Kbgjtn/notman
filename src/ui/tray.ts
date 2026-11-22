@@ -148,7 +148,7 @@ export class TrayIndicator {
       });
 
       Main.panel.addToStatusArea(uuid, this._indicator as never, index, position);
-      log.info("tray", "status indicator added");
+      log.debug("tray", "status indicator added");
     } catch (e) {
       this.destroy();
       throw e;
