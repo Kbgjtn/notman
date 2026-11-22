@@ -8,10 +8,12 @@ import { GlibScheduler } from "./src/glib-scheduler.js";
 import { log } from "./src/log.js";
 import { SettingsStore } from "./src/settings.js";
 import { createBridge } from "./src/shell-bridge.js";
+import { createPanelUi, type PanelUi } from "./src/ui/panel.js";
 
 export default class NotmanExtension extends Extension {
   private _engine: Engine | null = null;
   private _disposables: Disposables | null = null;
+  private _panel: PanelUi | null = null;
 
   enable(): void {
     try {
@@ -62,6 +64,8 @@ export default class NotmanExtension extends Extension {
       // asynchronous and a failure must still be fully teardown-able.
       this._engine = engine;
       this._disposables = disposables;
+      if (capabilities.panel)
+        this._panel = createPanelUi(adapter, rawSettings, engine, disposables);
       if (!registerDbus(engine, disposables))
         log.warn("extension", "D-Bus API unavailable, guard still active");
       log.info("extension", `enabled adapter=${adapter.id} tier=${tier}`);
@@ -72,6 +76,11 @@ export default class NotmanExtension extends Extension {
   }
 
   disable(): void {
+    try {
+      this._panel?.destroy();
+    } catch (e) {
+      log.err("extension", "panel destroy failed", e);
+    }
     try {
       this._engine?.stop();
     } catch (e) {
@@ -84,6 +93,7 @@ export default class NotmanExtension extends Extension {
     }
     this._engine = null;
     this._disposables = null;
+    this._panel = null;
     log.setDebugEnabled(false);
   }
 }
