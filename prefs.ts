@@ -1,4 +1,5 @@
 import Adw from "gi://Adw";
+import Gdk from "gi://Gdk";
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import Gtk from "gi://Gtk";
@@ -12,17 +13,33 @@ import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
 import { parseIndicatorPosition, parseThumbnailMode, SettingKey } from "./src/settings.js";
 import { IndicatorPosition, ThumbnailMode } from "./src/types.js";
 
-const THUMBNAIL_MODES: readonly ThumbnailMode[] = [
-  ThumbnailMode.Full,
-  ThumbnailMode.Compact,
-  ThumbnailMode.TextOnly,
-];
-
 const INDICATOR_POSITIONS: readonly IndicatorPosition[] = [
   IndicatorPosition.Left,
   IndicatorPosition.Center,
   IndicatorPosition.Right,
 ];
+
+const PREFS_CSS = `
+.notman-mode-frame {
+  border-radius: 12px;
+  border: 1px solid alpha(@window_fg_color, 0.14);
+  background-color: @card_bg_color;
+  padding: 6px;
+}
+.notman-mode-card {
+  border-radius: 9px;
+  padding: 12px 10px;
+  border: 1px solid transparent;
+  background-color: transparent;
+}
+.notman-mode-card:hover {
+  background-color: alpha(@window_fg_color, 0.05);
+}
+.notman-mode-card:checked {
+  background-color: alpha(@accent_bg_color, 0.16);
+  border-color: @accent_bg_color;
+}
+`;
 
 interface LiveStats {
   readonly activeCount: number;
@@ -73,6 +90,21 @@ function openExternalUri(uri: string): void {
 
 export default class NotmanPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window: Adw.PreferencesWindow): void {
+    window.search_enabled = true;
+    window.set_default_size(680, 720);
+
+    const display = Gdk.Display.get_default();
+    let cssProvider: Gtk.CssProvider | null = null;
+    if (display) {
+      cssProvider = new Gtk.CssProvider();
+      cssProvider.load_from_string(PREFS_CSS);
+      Gtk.StyleContext.add_provider_for_display(
+        display,
+        cssProvider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+      );
+    }
+
     const settings = this.getSettings();
     const bindings: Array<{ target: unknown; property: string }> = [];
     const signalIds: number[] = [];
@@ -87,6 +119,13 @@ export default class NotmanPreferences extends ExtensionPreferences {
     ): void => {
       settings.bind(key, target as never, property, flags);
       bindings.push({ target, property });
+    };
+
+    const addHeaderSwitch = (group: Adw.PreferencesGroup, key: SettingKey): Gtk.Switch => {
+      const toggle = new Gtk.Switch({ valign: Gtk.Align.CENTER });
+      bind(key, toggle, "active");
+      group.set_header_suffix(toggle);
+      return toggle;
     };
 
     const addSwitch = (
@@ -118,6 +157,39 @@ export default class NotmanPreferences extends ExtensionPreferences {
       });
       const row = new Adw.SpinRow({ title, subtitle, adjustment });
       bind(key, row, "value");
+      group.add(row);
+      return row;
+    };
+
+    const addSlider = (
+      group: Adw.PreferencesGroup,
+      key: SettingKey,
+      title: string,
+      subtitle: string,
+      lower: number,
+      upper: number,
+      step: number,
+    ): Adw.ActionRow => {
+      const adjustment = new Gtk.Adjustment({
+        lower,
+        upper,
+        step_increment: step,
+        page_increment: step * 2,
+        value: settings.get_int(key),
+      });
+      bind(key, adjustment, "value");
+      const scale = new Gtk.Scale({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        adjustment,
+        draw_value: true,
+        value_pos: Gtk.PositionType.TOP,
+        digits: 0,
+        round_digits: 0,
+        width_request: 180,
+        valign: Gtk.Align.CENTER,
+      });
+      const row = new Adw.ActionRow({ title, subtitle });
+      row.add_suffix(scale);
       group.add(row);
       return row;
     };
@@ -190,13 +262,9 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const topBarGroup = new Adw.PreferencesGroup({
       title: _("Top bar"),
+      description: _("Add a quick menu and live counter to the top bar."),
     });
-    addSwitch(
-      topBarGroup,
-      SettingKey.ShowIndicator,
-      _("Show top-bar icon"),
-      _("Add a quick menu and live counter to the top bar."),
-    );
+    addHeaderSwitch(topBarGroup, SettingKey.ShowIndicator);
 
     const positions = new Gtk.StringList({});
     positions.append(_("Left"));
@@ -245,42 +313,105 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const rulesGroup = new Adw.PreferencesGroup({
       title: _("Screenshot notifications"),
-      description: _("Set a limit to 0 to turn it off."),
+      description: _("Choose how screenshot previews are kept. Set a limit to 0 to turn it off."),
     });
     bind(SettingKey.GuardEnabled, rulesGroup, "sensitive", Gio.SettingsBindFlags.GET);
+    addHeaderSwitch(rulesGroup, SettingKey.ScreenshotNotifyEnabled);
 
-    addSwitch(
-      rulesGroup,
-      SettingKey.ScreenshotNotifyEnabled,
-      _("Show screenshot notifications"),
-      _("Turn off to dismiss screenshot notifications right away."),
-    );
-
-    const modes = new Gtk.StringList({});
-    modes.append(_("Full size"));
-    modes.append(_("Compact"));
-    modes.append(_("Text only"));
-    const modeRow = new Adw.ComboRow({
-      title: _("Preview style"),
-      subtitle: _("Compact shrinks previews to save memory; text only hides the image."),
-      model: modes,
+    const modeFrame = new Gtk.Box({
+      orientation: Gtk.Orientation.HORIZONTAL,
+      homogeneous: true,
+      spacing: 6,
+      margin_bottom: 12,
+      css_classes: ["notman-mode-frame"],
     });
-    const readModeIndex = (): number => {
+    const modeOptions: Array<{
+      mode: ThumbnailMode;
+      icon: string;
+      title: string;
+      subtitle: string;
+    }> = [
+      {
+        mode: ThumbnailMode.Full,
+        icon: "camera-photo-symbolic",
+        title: _("Full size"),
+        subtitle: _("Original resolution (~32 MiB at 4K)"),
+      },
+      {
+        mode: ThumbnailMode.Compact,
+        icon: "view-grid-symbolic",
+        title: _("Compact"),
+        subtitle: _("128 px preview (~36 KB, 99.8% less RAM)"),
+      },
+      {
+        mode: ThumbnailMode.TextOnly,
+        icon: "text-x-generic-symbolic",
+        title: _("Text only"),
+        subtitle: _("Icon & text only (0 B texture)"),
+      },
+    ];
+
+    const modeButtons = new Map<ThumbnailMode, Gtk.ToggleButton>();
+    let firstModeButton: Gtk.ToggleButton | null = null;
+    for (const opt of modeOptions) {
+      const card = new Gtk.ToggleButton({
+        css_classes: ["flat", "notman-mode-card"],
+        hexpand: true,
+      });
+      if (firstModeButton) {
+        card.set_group(firstModeButton);
+      } else {
+        firstModeButton = card;
+      }
+
+      const content = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 6,
+        halign: Gtk.Align.FILL,
+      });
+      content.append(
+        new Gtk.Image({
+          icon_name: opt.icon,
+          pixel_size: 28,
+          halign: Gtk.Align.START,
+          margin_bottom: 4,
+        }),
+      );
+      content.append(
+        new Gtk.Label({
+          label: opt.title,
+          xalign: 0,
+          css_classes: ["heading"],
+        }),
+      );
+      content.append(
+        new Gtk.Label({
+          label: opt.subtitle,
+          xalign: 0,
+          wrap: true,
+          css_classes: ["caption", "dim-label"],
+        }),
+      );
+      card.set_child(content);
+      card.connect("toggled", () => {
+        if (card.active) {
+          settings.set_string(SettingKey.ScreenshotThumbnailMode, opt.mode);
+        }
+      });
+      modeButtons.set(opt.mode, card);
+      modeFrame.append(card);
+    }
+
+    const syncModeCards = (): void => {
       const current = parseThumbnailMode(settings.get_string(SettingKey.ScreenshotThumbnailMode));
-      return Math.max(0, THUMBNAIL_MODES.indexOf(current));
+      const target = modeButtons.get(current);
+      if (target && !target.active) target.active = true;
     };
-    modeRow.selected = readModeIndex();
-    modeRow.connect("notify::selected", () => {
-      const mode = THUMBNAIL_MODES[modeRow.selected] ?? ThumbnailMode.Full;
-      settings.set_string(SettingKey.ScreenshotThumbnailMode, mode);
-    });
+    syncModeCards();
     signalIds.push(
-      settings.connect(`changed::${SettingKey.ScreenshotThumbnailMode}`, () => {
-        const selected = readModeIndex();
-        if (modeRow.selected !== selected) modeRow.selected = selected;
-      }),
+      settings.connect(`changed::${SettingKey.ScreenshotThumbnailMode}`, syncModeCards),
     );
-    rulesGroup.add(modeRow);
+    rulesGroup.add(modeFrame);
 
     const maxCountRow = addSpin(
       rulesGroup,
@@ -291,16 +422,16 @@ export default class NotmanPreferences extends ExtensionPreferences {
       100,
       1,
     );
-    const expireRow = addSpin(
+    const expireRow = addSlider(
       rulesGroup,
       SettingKey.ScreenshotExpireSeconds,
       _("Auto-dismiss after (seconds)"),
       _("Clear screenshot notifications once they're this old."),
       0,
       300,
-      1,
+      5,
     );
-    const budgetRow = addSpin(
+    const budgetRow = addSlider(
       rulesGroup,
       SettingKey.ScreenshotMemoryBudgetMb,
       _("Memory limit (MiB)"),
@@ -310,13 +441,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
       8,
     );
 
-    for (const dependentRow of [modeRow, maxCountRow, expireRow, budgetRow]) {
-      bind(
-        SettingKey.ScreenshotNotifyEnabled,
-        dependentRow,
-        "sensitive",
-        Gio.SettingsBindFlags.GET,
-      );
+    for (const dependent of [modeFrame, maxCountRow, expireRow, budgetRow]) {
+      bind(SettingKey.ScreenshotNotifyEnabled, dependent, "sensitive", Gio.SettingsBindFlags.GET);
     }
     screenshotsPage.add(rulesGroup);
 
@@ -344,20 +470,15 @@ export default class NotmanPreferences extends ExtensionPreferences {
       ),
     });
     bind(SettingKey.GuardEnabled, transientGroup, "sensitive", Gio.SettingsBindFlags.GET);
+    addHeaderSwitch(transientGroup, SettingKey.TransientExpireEnabled);
 
-    addSwitch(
-      transientGroup,
-      SettingKey.TransientExpireEnabled,
-      _("Auto-clear temporary notifications"),
-      _("Dismiss short-lived alerts from other apps after a short wait."),
-    );
     const transientDndRow = addSwitch(
       transientGroup,
       SettingKey.TransientDndOnly,
       _("Only during Do Not Disturb"),
       _("Run this cleanup only when notification banners are muted."),
     );
-    const transientExpireRow = addSpin(
+    const transientExpireRow = addSlider(
       transientGroup,
       SettingKey.TransientExpireSeconds,
       _("Clear after (seconds)"),
@@ -420,6 +541,27 @@ export default class NotmanPreferences extends ExtensionPreferences {
       _("Debug logging"),
       _("Write detailed activity logs to the system journal."),
     );
+
+    const resetButton = new Gtk.Button({
+      label: _("Reset"),
+      valign: Gtk.Align.CENTER,
+      css_classes: ["destructive-action"],
+    });
+    resetButton.connect("clicked", () => {
+      for (const key of Object.values(SettingKey)) {
+        try {
+          settings.reset(key);
+        } catch {
+          // Ignore individual key reset failures.
+        }
+      }
+    });
+    const resetRow = new Adw.ActionRow({
+      title: _("Reset settings"),
+      subtitle: _("Restore all Notman preferences to their default values."),
+    });
+    resetRow.add_suffix(resetButton);
+    advancedGroup.add(resetRow);
     aboutPage.add(advancedGroup);
 
     const baseUrl = (this.metadata.url ?? "https://github.com/Kbgjtn/notman").replace(/\/+$/, "");
@@ -442,6 +584,10 @@ export default class NotmanPreferences extends ExtensionPreferences {
       if (statsTimerId !== null) {
         GLib.source_remove(statsTimerId);
         statsTimerId = null;
+      }
+      if (display && cssProvider) {
+        Gtk.StyleContext.remove_provider_for_display(display, cssProvider);
+        cssProvider = null;
       }
       for (const id of signalIds) {
         try {

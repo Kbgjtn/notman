@@ -39,7 +39,8 @@ export class TrayIndicator {
   private readonly _indicator: IndicatorButton;
   private readonly _icon: St.Icon;
   private readonly _notifyItem: SwitchItem;
-  private readonly _thumbnailMenu: PopupMenu.PopupSubMenuMenuItem;
+  private readonly _modeButtons: St.Button[] = [];
+  private readonly _modeRow: PopupMenu.PopupBaseMenuItem;
   private readonly _statusSeparator: PopupMenu.PopupSeparatorMenuItem;
   private _statsTimerId: number | null = null;
   private _disposed = false;
@@ -74,7 +75,7 @@ export class TrayIndicator {
       () => this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled),
       (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
     );
-    this._thumbnailMenu = this.addThumbnailModeMenu();
+    this._modeRow = this.addPreviewModeBar();
 
     this._statusSeparator = new PopupMenu.PopupSeparatorMenuItem("");
     menu.addMenuItem(this._statusSeparator);
@@ -92,9 +93,11 @@ export class TrayIndicator {
     const syncVisualState = (): void => {
       const guardEnabled = this._settings.get_boolean(SettingKey.GuardEnabled);
       const notifyEnabled = this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled);
+      const modeActive = guardEnabled && notifyEnabled;
       this._icon.opacity = guardEnabled ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
       this._notifyItem.setSensitive(guardEnabled);
-      this._thumbnailMenu.setSensitive(guardEnabled && notifyEnabled);
+      this._modeRow.opacity = modeActive ? ICON_ACTIVE_OPACITY : ICON_PAUSED_OPACITY;
+      for (const button of this._modeButtons) button.reactive = modeActive;
       this.refreshStatus();
     };
     this.watchSetting(SettingKey.GuardEnabled, syncVisualState);
@@ -173,58 +176,66 @@ export class TrayIndicator {
     });
   }
 
-  private addThumbnailModeMenu(): PopupMenu.PopupSubMenuMenuItem {
-    const submenu = new PopupMenu.PopupSubMenuMenuItem(_("Previews"));
-    const choices: Array<{
-      mode: ThumbnailMode;
-      shortLabel: string;
-      item: PopupMenu.PopupMenuItem;
-    }> = [
-      {
-        mode: ThumbnailMode.Full,
-        shortLabel: _("Full"),
-        item: new PopupMenu.PopupMenuItem(_("Full size")),
-      },
+  private addPreviewModeBar(): PopupMenu.PopupBaseMenuItem {
+    const row = new PopupMenu.PopupBaseMenuItem({
+      reactive: false,
+      can_focus: false,
+    });
+    const box = new St.BoxLayout({
+      x_expand: true,
+      style: "spacing: 6px;",
+    });
+    const choices: Array<{ mode: ThumbnailMode; label: string; button: St.Button }> = [
+      { mode: ThumbnailMode.Full, label: _("Full"), button: this.makeModeButton(_("Full")) },
       {
         mode: ThumbnailMode.Compact,
-        shortLabel: _("Compact"),
-        item: new PopupMenu.PopupMenuItem(_("Compact")),
+        label: _("Compact"),
+        button: this.makeModeButton(_("Compact")),
       },
       {
         mode: ThumbnailMode.TextOnly,
-        shortLabel: _("Text only"),
-        item: new PopupMenu.PopupMenuItem(_("Text only")),
+        label: _("Text"),
+        button: this.makeModeButton(_("Text")),
       },
     ];
 
     for (const choice of choices) {
-      choice.item.connect("activate", () => {
+      choice.button.connect("clicked", () => {
         try {
           this._settings.set_string(SettingKey.ScreenshotThumbnailMode, choice.mode);
         } catch (e) {
           log.err("tray", `could not update ${SettingKey.ScreenshotThumbnailMode}`, e);
         }
       });
-      submenu.menu.addMenuItem(choice.item);
+      this._modeButtons.push(choice.button);
+      box.add_child(choice.button);
     }
 
     const refresh = (): void => {
       const current = parseThumbnailMode(
         this._settings.get_string(SettingKey.ScreenshotThumbnailMode),
       );
-      let activeLabel = _("Full");
       for (const choice of choices) {
-        const isCurrent = choice.mode === current;
-        choice.item.setOrnament(isCurrent ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
-        if (isCurrent) activeLabel = choice.shortLabel;
+        choice.button.checked = choice.mode === current;
       }
-      submenu.label.text = `${_("Previews")}: ${activeLabel}`;
     };
 
     refresh();
     this.watchSetting(SettingKey.ScreenshotThumbnailMode, refresh);
-    this._indicator.menu.addMenuItem(submenu);
-    return submenu;
+    row.add_child(box);
+    this._indicator.menu.addMenuItem(row);
+    return row;
+  }
+
+  private makeModeButton(label: string): St.Button {
+    return new St.Button({
+      label,
+      toggle_mode: true,
+      can_focus: true,
+      x_expand: true,
+      style_class: "button",
+      style: "padding: 4px 10px;",
+    });
   }
 
   private addSwitch(
