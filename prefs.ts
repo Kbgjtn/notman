@@ -7,7 +7,7 @@ import {
   ExtensionPreferences,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 
-import { formatMiB } from "./src/byte-estimate.js";
+import { formatBytes } from "./src/byte-estimate.js";
 import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
 import { parseThumbnailMode, SettingKey } from "./src/settings.js";
 import { ThumbnailMode } from "./src/types.js";
@@ -136,11 +136,11 @@ export default class NotmanPreferences extends ExtensionPreferences {
         statusGroup.description = "";
         activeRow.subtitle =
           stats.estimatedBytes > 0
-            ? `${stats.activeCount} (${formatMiB(stats.estimatedBytes)})`
+            ? `${stats.activeCount} (${formatBytes(stats.estimatedBytes)})`
             : String(stats.activeCount);
         prunedRow.subtitle =
           stats.peakBytes > 0
-            ? `${stats.prunedCount} · ${_("Peak")} ${formatMiB(stats.peakBytes)}`
+            ? `${stats.prunedCount} · ${_("Peak")} ${formatBytes(stats.peakBytes)}`
             : String(stats.prunedCount);
       });
     };

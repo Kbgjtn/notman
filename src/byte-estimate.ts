@@ -1,7 +1,15 @@
+export const KiB = 1024;
 export const MiB = 1024 * 1024;
 
 export function formatMiB(bytes: number): string {
   return `${(Math.max(0, bytes) / MiB).toFixed(1)} MiB`;
+}
+
+export function formatBytes(bytes: number): string {
+  const safe = Math.max(0, bytes);
+  if (safe >= MiB) return formatMiB(safe);
+  if (safe >= KiB) return `${Math.round(safe / KiB)} KB`;
+  return `${Math.round(safe)} B`;
 }
 
 /**
