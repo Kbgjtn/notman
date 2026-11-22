@@ -1,5 +1,6 @@
 import { log } from "./log.js";
 import { CapRule } from "./rules/cap.js";
+import { RetentionRule } from "./rules/retention.js";
 import { ScreenshotRule } from "./rules/screenshot.js";
 import { TransientRule } from "./rules/transient.js";
 import type { Scheduler } from "./scheduler.js";
@@ -17,7 +18,12 @@ import {
 const SWEEP_INTERVAL_MS = 1000;
 
 export class Engine {
-  private readonly _rules: Rule[] = [new ScreenshotRule(), new TransientRule(), new CapRule()];
+  private readonly _rules: Rule[] = [
+    new ScreenshotRule(),
+    new TransientRule(),
+    new RetentionRule(),
+    new CapRule(),
+  ];
   private readonly _handles = new Map<number, NotificationHandle>();
   private readonly _pending = new Set<number>();
   private readonly _stats: Stats;

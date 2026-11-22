@@ -30,6 +30,8 @@ export interface RuleSettings {
   readonly transientExpireEnabled: boolean;
   readonly transientExpireSeconds: number;
   readonly transientDndOnly: boolean;
+  readonly globalExpireMinutes: number;
+  readonly globalMaxCount: number;
 }
 
 export interface NotificationHandle {

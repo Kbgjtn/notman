@@ -20,6 +20,8 @@ export interface MutableRuleSettings {
   transientExpireEnabled: boolean;
   transientExpireSeconds: number;
   transientDndOnly: boolean;
+  globalExpireMinutes: number;
+  globalMaxCount: number;
 }
 
 export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRuleSettings {
@@ -34,6 +36,8 @@ export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRule
     transientExpireEnabled: false,
     transientExpireSeconds: 30,
     transientDndOnly: true,
+    globalExpireMinutes: 0,
+    globalMaxCount: 0,
     ...overrides,
   };
 }

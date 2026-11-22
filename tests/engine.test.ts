@@ -466,4 +466,39 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(0);
     expect(engine.getStats().prunedCount).toBe(1);
   });
+
+  it("enforces global retention cap across mixed notification sources", () => {
+    const oldest = new FakeHandle(1, SourceKey.Other, 10, 0, false, false, false);
+    const newer = new FakeHandle(2, SourceKey.Other, 20, 0, false, false, false);
+    const notifications = new Map<unknown, number>([
+      [{}, 1],
+      [{}, 2],
+    ]);
+    const [oldestNotification, newerNotification] = [...notifications.keys()];
+    const bridge: Bridge = {
+      ...makeBridge(
+        new Map([
+          [1, oldest],
+          [2, newer],
+        ]),
+        notifications,
+      ),
+      sourceKeyFor: () => SourceKey.Other,
+    };
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ globalMaxCount: 1 })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(oldestNotification);
+    engine.onNotificationAdded(newerNotification);
+
+    expect(oldest.destroyed).toBe(true);
+    expect(newer.destroyed).toBe(false);
+    expect(engine.getStats().activeCount).toBe(1);
+    expect(engine.getStats().prunedCount).toBe(1);
+  });
 });

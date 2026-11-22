@@ -44,6 +44,8 @@ describe("SettingsStore", () => {
       [SettingKey.TransientExpireEnabled]: true,
       [SettingKey.TransientExpireSeconds]: 45,
       [SettingKey.TransientDndOnly]: false,
+      [SettingKey.GlobalExpireMinutes]: 60,
+      [SettingKey.GlobalMaxCount]: 25,
     });
     const store = new SettingsStore(settings as never);
 
@@ -58,6 +60,8 @@ describe("SettingsStore", () => {
       transientExpireEnabled: true,
       transientExpireSeconds: 45,
       transientDndOnly: false,
+      globalExpireMinutes: 60,
+      globalMaxCount: 25,
     };
     expect(store.read()).toEqual(expected);
   });
@@ -80,7 +84,7 @@ describe("SettingsStore", () => {
     const first = store.read();
     const second = store.read();
     expect(second).toBe(first);
-    expect(backend.get_int).toHaveBeenCalledTimes(5);
+    expect(backend.get_int).toHaveBeenCalledTimes(7);
 
     // Non-rule keys should not invalidate cache or fire rule listeners.
     backend.emitChanged(SettingKey.ShowIndicator);
@@ -137,6 +141,8 @@ describe("SettingsStore", () => {
       transientExpireEnabled: false,
       transientExpireSeconds: 30,
       transientDndOnly: true,
+      globalExpireMinutes: 0,
+      globalMaxCount: 0,
     });
     expect(() => store.setGuardEnabled(false)).not.toThrow();
     expect(() => store.setNotifyEnabled(false)).not.toThrow();

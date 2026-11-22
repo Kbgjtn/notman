@@ -14,6 +14,8 @@ export enum SettingKey {
   TransientExpireEnabled = "transient-expire-enabled",
   TransientExpireSeconds = "transient-expire-seconds",
   TransientDndOnly = "transient-dnd-only",
+  GlobalExpireMinutes = "global-expire-minutes",
+  GlobalMaxCount = "global-max-count",
   ShowIndicator = "show-indicator",
   ClearOnPanelOpen = "clear-on-panel-open",
   DebugLogging = "debug-logging",
@@ -30,6 +32,8 @@ const DEFAULTS: RuleSettings = {
   transientExpireEnabled: false,
   transientExpireSeconds: 30,
   transientDndOnly: true,
+  globalExpireMinutes: 0,
+  globalMaxCount: 0,
 };
 
 const RULE_KEYS = new Set<string>([
@@ -43,6 +47,8 @@ const RULE_KEYS = new Set<string>([
   SettingKey.TransientExpireEnabled,
   SettingKey.TransientExpireSeconds,
   SettingKey.TransientDndOnly,
+  SettingKey.GlobalExpireMinutes,
+  SettingKey.GlobalMaxCount,
 ]);
 
 export function parseThumbnailMode(raw: string): ThumbnailMode {
@@ -134,6 +140,11 @@ export class SettingsStore {
         DEFAULTS.transientExpireSeconds,
       ),
       transientDndOnly: this.getBoolean(SettingKey.TransientDndOnly, DEFAULTS.transientDndOnly),
+      globalExpireMinutes: this.getInt(
+        SettingKey.GlobalExpireMinutes,
+        DEFAULTS.globalExpireMinutes,
+      ),
+      globalMaxCount: this.getInt(SettingKey.GlobalMaxCount, DEFAULTS.globalMaxCount),
     };
     if (this._changedId !== null) this._cache = snapshot;
     return snapshot;

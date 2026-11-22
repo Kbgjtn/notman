@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MiB } from "../src/byte-estimate.js";
 import { CapRule } from "../src/rules/cap.js";
+import { RetentionRule } from "../src/rules/retention.js";
 import { ScreenshotRule } from "../src/rules/screenshot.js";
 import { TransientRule } from "../src/rules/transient.js";
 import { SourceKey, ThumbnailMode } from "../src/types.js";
@@ -398,6 +399,74 @@ describe("TransientRule", () => {
         3,
         true,
       ),
+    );
+    expect(outcome.destroy).toEqual([normal]);
+  });
+});
+
+describe("RetentionRule", () => {
+  const rule = new RetentionRule();
+
+  it("is inert when both limits are zero or guard is off", () => {
+    const old = new FakeHandle(1, SourceKey.Other, 0, 0, false, false, false);
+    expect(
+      rule.evaluate(
+        [old],
+        makeContext(makeSettings({ globalExpireMinutes: 0, globalMaxCount: 0 }), 3_600_000),
+      ).destroy,
+    ).toEqual([]);
+    expect(
+      rule.evaluate(
+        [old],
+        makeContext(
+          makeSettings({ guardEnabled: false, globalExpireMinutes: 5, globalMaxCount: 1 }),
+          3_600_000,
+        ),
+      ).destroy,
+    ).toEqual([]);
+  });
+
+  it("expires notifications across all sources older than global-expire-minutes", () => {
+    const oldOther = new FakeHandle(1, SourceKey.Other, 60_000, 0, false, false, false);
+    const oldShot = new FakeHandle(2, SourceKey.Screenshot, 120_000, 0, false, false, true);
+    const freshOther = new FakeHandle(3, SourceKey.Other, 500_000, 0, false, false, false);
+    const outcome = rule.evaluate(
+      [oldOther, oldShot, freshOther],
+      makeContext(makeSettings({ globalExpireMinutes: 5 }), 600_000),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1, 2]);
+  });
+
+  it("caps total notifications across all sources by oldest first", () => {
+    const handles = [
+      new FakeHandle(1, SourceKey.Other, 10, 0, false, false, false),
+      new FakeHandle(2, SourceKey.Screenshot, 20, 0, false, false, true),
+      new FakeHandle(3, SourceKey.Other, 30, 0, false, false, false),
+      new FakeHandle(4, SourceKey.Other, 40, 0, false, false, false),
+    ];
+    const outcome = rule.evaluate(handles, makeContext(makeSettings({ globalMaxCount: 2 })));
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1, 2]);
+  });
+
+  it("combines age expiry and count cap without over-pruning or duplicates", () => {
+    const expired = new FakeHandle(1, SourceKey.Other, 60_000, 0, false, false, false);
+    const fresh1 = new FakeHandle(2, SourceKey.Other, 500_000, 0, false, false, false);
+    const fresh2 = new FakeHandle(3, SourceKey.Other, 550_000, 0, false, false, false);
+    const outcome = rule.evaluate(
+      [expired, fresh1, fresh2],
+      makeContext(makeSettings({ globalExpireMinutes: 5, globalMaxCount: 2 }), 600_000),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1]);
+  });
+
+  it("never destroys critical, feedback, or currently shown notifications", () => {
+    const critical = new FakeHandle(1, SourceKey.Other, 0, 0, true, false, false);
+    const feedback = new FakeHandle(2, SourceKey.Other, 0, 0, false, true, false);
+    const shown = new FakeHandle(3, SourceKey.Other, 0, 0, false, false, false);
+    const normal = new FakeHandle(4, SourceKey.Other, 0, 0, false, false, false);
+    const outcome = rule.evaluate(
+      [critical, feedback, shown, normal],
+      makeContext(makeSettings({ globalExpireMinutes: 1, globalMaxCount: 1 }), 600_000, 3),
     );
     expect(outcome.destroy).toEqual([normal]);
   });

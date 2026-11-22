@@ -285,6 +285,32 @@ export default class NotmanPreferences extends ExtensionPreferences {
       bind(SettingKey.TransientExpireEnabled, dependentRow, "sensitive", Gio.SettingsBindFlags.GET);
     }
     page.add(transientGroup);
+
+    const retentionGroup = new Adw.PreferencesGroup({
+      title: _("Global retention"),
+      description: _("Limits applied across all apps. Zero disables an individual limit."),
+    });
+    bind(SettingKey.GuardEnabled, retentionGroup, "sensitive", Gio.SettingsBindFlags.GET);
+
+    addSpin(
+      retentionGroup,
+      SettingKey.GlobalMaxCount,
+      _("Maximum notifications"),
+      _("Oldest non-critical notifications across all apps are removed beyond this count."),
+      0,
+      100,
+      1,
+    );
+    addSpin(
+      retentionGroup,
+      SettingKey.GlobalExpireMinutes,
+      _("Expire after (minutes)"),
+      _("Remove non-critical notifications older than this many minutes."),
+      0,
+      1440,
+      5,
+    );
+    page.add(retentionGroup);
     const advancedGroup = new Adw.PreferencesGroup({
       title: _("Advanced"),
     });

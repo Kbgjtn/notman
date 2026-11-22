@@ -105,6 +105,26 @@
       </description>
     </key>
 
+    <key name="global-expire-minutes" type="i">
+      <default>0</default>
+      <range min="0" max="1440"/>
+      <summary>Global notification expiry (minutes)</summary>
+      <description>
+        Remove non-critical notifications across all apps older than this many
+        minutes. Zero disables global age expiry.
+      </description>
+    </key>
+
+    <key name="global-max-count" type="i">
+      <default>0</default>
+      <range min="0" max="100"/>
+      <summary>Global maximum retained notifications</summary>
+      <description>
+        Prune oldest non-critical notifications across all apps beyond this
+        count. Zero disables the global cap.
+      </description>
+    </key>
+
     <key name="show-indicator" type="b">
       <default>true</default>
       <summary>Show top-bar indicator</summary>
