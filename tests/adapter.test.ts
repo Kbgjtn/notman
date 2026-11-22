@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { resolveAdapterMajor, SupportedMajor } from "../src/compat/version.js";
@@ -17,5 +18,12 @@ describe("resolveAdapterMajor", () => {
     expect(resolveAdapterMajor("49.0")).toBeNull();
     expect(resolveAdapterMajor("")).toBeNull();
     expect(resolveAdapterMajor("unknown")).toBeNull();
+  });
+
+  it("keeps metadata.json shell-version in sync with supported adapters", () => {
+    const metadata = JSON.parse(readFileSync("metadata.json", "utf8")) as {
+      "shell-version": string[];
+    };
+    expect(metadata["shell-version"]).toEqual(Object.values(SupportedMajor));
   });
 });

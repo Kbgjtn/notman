@@ -51,3 +51,52 @@ jobs:
           name: notman-extension
           path: notman.zip
           if-no-files-found: error
+
+  compat:
+    needs: check
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gnome: "46"
+            image: ubuntu:24.04
+            install: apt-get update && apt-get install -y --no-install-recommends gjs libglib2.0-bin gir1.2-gdkpixbuf-2.0
+          - gnome: "47"
+            image: fedora:41
+            install: dnf install -y gjs glib2 gdk-pixbuf2
+          - gnome: "48"
+            image: fedora:42
+            install: dnf install -y gjs glib2 gdk-pixbuf2
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install GJS and GLib tools for GNOME ${{ matrix.gnome }}
+        run: ${{ matrix.install }}
+
+      - name: Validate GSettings schema against GNOME ${{ matrix.gnome }} GLib
+        run: glib-compile-schemas --strict schemas
+
+      - name: Verify metadata and GI bindings on GNOME ${{ matrix.gnome }} GJS
+        run: |
+          cat <<'EOF' > /tmp/compat-check.mjs
+          import GdkPixbuf from "gi://GdkPixbuf";
+          import Gio from "gi://Gio";
+          import GLib from "gi://GLib";
+          import System from "system";
+
+          const [ok, bytes] = Gio.File.new_for_path("metadata.json").load_contents(null);
+          if (!ok) throw new Error("Failed to read metadata.json");
+          const metadata = JSON.parse(new TextDecoder("utf-8").decode(bytes));
+          const target = "${{ matrix.gnome }}";
+          if (!Array.isArray(metadata["shell-version"]) || !metadata["shell-version"].includes(target)) {
+            throw new Error(`metadata.json missing shell-version ${target}`);
+          }
+          if (typeof GdkPixbuf.Pixbuf.new_from_stream_at_scale_async !== "function") {
+            throw new Error("GdkPixbuf.Pixbuf.new_from_stream_at_scale_async unavailable");
+          }
+          print(`GNOME ${target} compat OK (GJS ${System.version}, GLib ${GLib.MAJOR_VERSION}.${GLib.MINOR_VERSION})`);
+          EOF
+          gjs -m /tmp/compat-check.mjs
