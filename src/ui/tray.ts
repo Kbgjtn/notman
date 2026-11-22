@@ -147,12 +147,10 @@ export function createTrayUi(
         x_align: Clutter.ActorAlign.END,
       });
       const minus = new St.Button({
-        style_class: "icon-button",
         can_focus: true,
         child: new St.Icon({ icon_name: "list-remove-symbolic" }),
       }) as unknown as Emitter & { accessible_name: string };
       const plus = new St.Button({
-        style_class: "icon-button",
         can_focus: true,
         child: new St.Icon({ icon_name: "list-add-symbolic" }),
       }) as unknown as Emitter & { accessible_name: string };
@@ -163,10 +161,16 @@ export function createTrayUi(
         layout_manager: { spacing: number };
       };
       box.layout_manager.spacing = 12;
+      const steppers = new St.BoxLayout() as unknown as {
+        add_child(child: unknown): void;
+        layout_manager: { spacing: number };
+      };
+      steppers.layout_manager.spacing = 4;
+      steppers.add_child(minus);
+      steppers.add_child(plus);
       box.add_child(nameLabel);
       box.add_child(valueLabel);
-      box.add_child(minus);
-      box.add_child(plus);
+      box.add_child(steppers);
       item.actor.add_child(box);
       menu.addMenuItem(item);
 
