@@ -106,9 +106,13 @@ export class ShellBridge implements Bridge {
     const sourceAddedId = this._tray.connect(
       this._adapter.signals.sourceAdded,
       (...args: unknown[]) => {
-        log.debug("bridge", "source-added signal received");
-        // GJS passes the emitter as args[0]; the source is args[1].
-        this.observeSource(args[1]);
+        try {
+          log.debug("bridge", "source-added signal received");
+          // GJS passes the emitter as args[0]; the source is args[1].
+          this.observeSource(args[1]);
+        } catch (e) {
+          log.err("bridge", "source-added handler failed", e);
+        }
       },
     );
     this._disposables.add(() => {
@@ -416,10 +420,14 @@ export class ShellBridge implements Bridge {
     );
 
     const signalId = emitter.connect(this._adapter.signals.destroy, () => {
-      this._destroyed.add(notification);
-      this.cancelCompaction(notification);
-      this._disposables.remove(dispose);
-      onDestroyed(notification);
+      try {
+        this._destroyed.add(notification);
+        this.cancelCompaction(notification);
+        this._disposables.remove(dispose);
+        onDestroyed(notification);
+      } catch (e) {
+        log.err("bridge", "notification destroy handler failed", e);
+      }
     });
     const dispose = (): void => {
       try {
@@ -447,8 +455,12 @@ export class ShellBridge implements Bridge {
         let addedId: number | null = emitter.connect(
           this._adapter.signals.notificationAdded,
           (...args: unknown[]) => {
-            // GJS passes the emitter as args[0]; the notification is args[1].
-            this.attachNotification(args[1]);
+            try {
+              // GJS passes the emitter as args[0]; the notification is args[1].
+              this.attachNotification(args[1]);
+            } catch (e) {
+              log.err("bridge", "notification-added handler failed", e);
+            }
           },
         );
         let destroyId: number | null = null;

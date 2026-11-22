@@ -102,11 +102,16 @@ export class TrayIndicator {
     syncVisualState();
 
     const openId = menu.connect("open-state-changed", (...args: unknown[]) => {
-      if (args[1]) {
-        this.refreshAll();
-        this.startStatsTimer();
-      } else {
-        this.stopStatsTimer();
+      if (this._disposed) return;
+      try {
+        if (args[1]) {
+          this.refreshAll();
+          this.startStatsTimer();
+        } else {
+          this.stopStatsTimer();
+        }
+      } catch (e) {
+        log.err("tray", "menu state handler failed", e);
       }
     });
     this._disposers.push(() => {

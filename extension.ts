@@ -102,35 +102,39 @@ export default class NotmanExtension extends Extension {
         let currentPosition: IndicatorPosition | null = null;
         let currentIndex: number | null = null;
         const syncIndicator = (): void => {
-          const wantIndicator = rawSettings.get_boolean(SettingKey.ShowIndicator);
-          const position = parseIndicatorPosition(
-            rawSettings.get_string(SettingKey.IndicatorPosition),
-          );
-          const index = Math.max(0, rawSettings.get_int(SettingKey.IndicatorIndex));
-          if (!wantIndicator) {
+          try {
+            const wantIndicator = rawSettings.get_boolean(SettingKey.ShowIndicator);
+            const position = parseIndicatorPosition(
+              rawSettings.get_string(SettingKey.IndicatorPosition),
+            );
+            const index = Math.max(0, rawSettings.get_int(SettingKey.IndicatorIndex));
+            if (!wantIndicator) {
+              if (indicator) {
+                indicator.destroy();
+                indicator = null;
+                currentPosition = null;
+                currentIndex = null;
+              }
+              return;
+            }
+            if (indicator && currentPosition === position && currentIndex === index) return;
             if (indicator) {
               indicator.destroy();
               indicator = null;
-              currentPosition = null;
-              currentIndex = null;
             }
-            return;
+            indicator = TrayIndicator.create(
+              this.uuid,
+              rawSettings,
+              engine,
+              () => this.openPreferences(),
+              position,
+              index,
+            );
+            currentPosition = indicator ? position : null;
+            currentIndex = indicator ? index : null;
+          } catch (e) {
+            log.err("extension", "indicator sync failed", e);
           }
-          if (indicator && currentPosition === position && currentIndex === index) return;
-          if (indicator) {
-            indicator.destroy();
-            indicator = null;
-          }
-          indicator = TrayIndicator.create(
-            this.uuid,
-            rawSettings,
-            engine,
-            () => this.openPreferences(),
-            position,
-            index,
-          );
-          currentPosition = indicator ? position : null;
-          currentIndex = indicator ? index : null;
         };
         syncIndicator();
         const indicatorSettingIds = [
