@@ -1,12 +1,12 @@
 # Notman
 
-**Notification manager for GNOME Shell 46, 47, and 48.**
+**Notification manager for GNOME Shell 46 through 51.**
 
 Notman fixes GNOME Shell's screenshot & Do-Not-Disturb notification memory leaks and exposes the notification policies GNOME keeps hidden: compact downscaled previews (~36 KB vs ~32 MiB at 4K), per-app rules, burst protection, scheduled Quiet hours, and native libadwaita Preferences.
 
 ## Features
 
-- **Compact screenshot thumbnails**: Downscales screenshot previews off-thread to ~128 px (~36 KB, **99.8% less RAM** at 4K) with burst backpressure limits and clean fallback to text-only.
+- **Compact screenshot thumbnails**: Reads the screenshot from the clipboard and downscales previews off-thread to ~128 px (~36 KB, **99.8% less RAM** at 4K), with burst backpressure limits and clean fallback to text-only.
 - **Screenshot & screen-recording controls**: Discard on arrival, cap retained count, auto-dismiss by age, enforce a memory limit, or clear screenshots when opening the calendar panel.
 - **DND transient-notification cleanup**: Automatically expires short-lived notifications from other apps that get stuck during Do Not Disturb, while always protecting critical, feedback, and currently shown alerts.
 - **Burst limit & per-app rules**: Collapse rapid notification storms per app within a sliding window, or configure custom mute, count, and expiry overrides by app name or installed-app picker.
@@ -72,38 +72,17 @@ gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
 
 ## Compatibility
 
-| GNOME | Adapter | Notes                                                                              |
-| ----- | ------- | ---------------------------------------------------------------------------------- |
-| 46    | `v46`   | Primary dev/QA target; upstream notification path verified against source          |
-| 47    | `v47`   | Supported via shared GNOME 46+ base adapter                                        |
-| 48    | `v48`   | Supported; adapts GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` signature |
-| < 46  | none    | Older `MessageTray` / legacy `imports.ui.*` APIs                                   |
+| GNOME | Adapter | Notes                                                                                  |
+| ----- | ------- | -------------------------------------------------------------------------------------- |
+| 46    | `v46`   | Primary dev/QA target; upstream notification path verified against source              |
+| 47    | `v47`   | Supported via shared GNOME 46+ base adapter                                            |
+| 48    | `v48`   | Adapts GNOME 48 `St.ImageContent.set_bytes(coglContext, ...)` signature                |
+| 49    | `v49`   | Shared Screen Capture source distinguishes screenshots from screencasts by image gicon |
+| 50    | `v50`   | Same capture path as GNOME 49                                                          |
+| 51    | `v51`   | Same capture path as GNOME 49                                                          |
+| < 46  | none    | Older `MessageTray` / legacy `imports.ui.*` APIs                                       |
 
 Node/npm is needed **only at build time**. The installed extension is plain JS.
-
-## Measurement & benchmarks
-
-`tools/measure.sh` fires 10 `Shift+Print` screenshots on one pinned CPU under a 60-second timeout and records `gnome-shell` RSS per shot in `results/baseline.csv`.
-
-`tools/benchmark.sh` runs named cases (`leak`, `leak-dndoff`, `drop`, `compact`, `text`, `text-dndoff`, `limit`, `expire`, `budget`, `cap`, `combined`, `unlimited`) with screenshot disk saving disabled, restoring all settings and display modes on exit:
-
-```sh
-make baseline
-make benchmark CONFIRM=1 CASE=compact RES=2560x1440 RUNS=2
-make report   # writes results/report.md
-```
-
-## Layout
-
-```text
-extension.ts, prefs.ts   entry points (shell lifecycle and GTK4/Adw prefs)
-stylesheet.css           tray pill toggle and stat-card styles
-src/                     bridge, compat adapters (v46–v48), rules, quiet hours, config I/O, tray UI, D-Bus
-schemas/                 GSettings schema
-tests/                   Vitest unit tests (104 tests)
-tools/                   isolated Xvfb QA and bounded benchmark harness
-dist/                    generated, gitignored
-```
 
 ## License
 

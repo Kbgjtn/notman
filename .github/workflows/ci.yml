@@ -80,6 +80,15 @@ jobs:
           - gnome: "48"
             image: fedora:42
             install: dnf install -y gjs glib2 gdk-pixbuf2
+          - gnome: "49"
+            image: fedora:43
+            install: dnf install -y gjs glib2 gdk-pixbuf2
+          - gnome: "50"
+            image: fedora:44
+            install: dnf install -y gjs glib2 gdk-pixbuf2
+          - gnome: "51"
+            image: fedora:45
+            install: dnf install -y gjs glib2 gdk-pixbuf2
     container:
       image: ${{ matrix.image }}
     steps:

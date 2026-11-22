@@ -2,7 +2,12 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
 import type { AdapterCapabilities, ShellAdapter } from "./adapter.js";
-import { hasSourceIcon, SCREENCAST_ICON, SCREENSHOT_ICON } from "./source-match.js";
+import {
+  hasSourceIcon,
+  SCREEN_CAPTURE_ICON,
+  SCREENCAST_ICON,
+  SCREENSHOT_ICON,
+} from "./source-match.js";
 
 type LegacyImageContent = {
   set_bytes(
@@ -18,6 +23,7 @@ type LegacyImageContent = {
 export abstract class GnomeShellAdapter implements ShellAdapter {
   abstract readonly id: string;
   abstract readonly version: string;
+  readonly mergedCaptureSource: boolean = false;
   readonly signals = {
     sourceAdded: "source-added",
     notificationAdded: "notification-added",
@@ -71,7 +77,7 @@ export abstract class GnomeShellAdapter implements ShellAdapter {
   }
 
   isScreenshotSource(source: unknown): boolean {
-    return hasSourceIcon(source, SCREENSHOT_ICON);
+    return hasSourceIcon(source, SCREENSHOT_ICON) || hasSourceIcon(source, SCREEN_CAPTURE_ICON);
   }
 
   isScreencastSource(source: unknown): boolean {

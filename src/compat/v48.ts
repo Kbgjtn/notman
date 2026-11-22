@@ -19,8 +19,8 @@ type StageWithContext = {
 
 /** GNOME Shell 48 adapter (handles St.ImageContent.set_bytes Cogl.Context parameter). */
 export class V48Adapter extends GnomeShellAdapter {
-  readonly id = "v48";
-  readonly version = "48";
+  readonly id: string = "v48";
+  readonly version: string = "48";
 
   override setImageContentBytes(
     content: unknown,
