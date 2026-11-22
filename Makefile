@@ -12,7 +12,12 @@ SHOTS ?= 10
 PIN_CPU ?= 2
 TIMEOUT ?= 90
 
-.PHONY: all build check check-schema check-imports check-scripts test lint lint-fix format dev-install install pack uninstall clean baseline benchmark report
+.PHONY: all help build check check-schema check-imports check-scripts test lint lint-fix format dev-install install pack uninstall clean baseline benchmark report qa-xvfb
+
+help:
+	@echo "Targets: build, check, lint, test, dev-install, install, pack, baseline, benchmark, report, clean"
+	@echo "benchmark: CONFIRM=1 RES=WxH [CASE=leak] [RUNS=2] [SHOTS=10] [PIN_CPU=2] [TIMEOUT=90]"
+	@echo "Cases: leak, leak-dndoff, drop, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
 
 all: build
 
@@ -94,8 +99,8 @@ baseline:
 
 # Bounded case matrix. Requires explicit confirmation to avoid accidental load.
 benchmark:
-	@if [ "$(CONFIRM)" != "1" ]; then \
-		echo "Refusing to run: set CONFIRM=1 and name CASE, RES, RUNS explicitly"; \
+	@if [ "$(CONFIRM)" != "1" ] || [ -z "$(RES)" ]; then \
+		echo "Refusing to run: set CONFIRM=1 and RES=WxH (run 'make help' for options)"; \
 		exit 1; \
 	fi
 	bash tools/benchmark.sh --case "$(CASE)" --res "$(RES)" --runs "$(RUNS)" --shots "$(SHOTS)" --pin "$(PIN_CPU)" --timeout "$(TIMEOUT)" --confirm
@@ -103,6 +108,10 @@ benchmark:
 report:
 	python3 tools/report.py > results/report.md
 	@echo "Wrote results/report.md"
+
+# Isolated QA: private Xvfb display + private D-Bus session, no live session use.
+qa-xvfb: build
+	dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" bash tools/qa-xvfb.sh
 
 clean:
 	rm -rf dist node_modules notman.zip schemas/gschemas.compiled

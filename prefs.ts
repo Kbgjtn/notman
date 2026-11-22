@@ -1,12 +1,20 @@
 import Adw from "gi://Adw";
 import Gio from "gi://Gio";
-import type GLib from "gi://GLib";
+import GLib from "gi://GLib";
 import Gtk from "gi://Gtk";
 import {
   gettext as _,
   ExtensionPreferences,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
 import { MiB } from "./src/ui/mappings.js";
+
+const bindingRegistry = new WeakMap<Gio.Settings, Array<{ row: unknown; property: string }>>();
+
+function trackBinding(settings: Gio.Settings, row: unknown, property: string): void {
+  const list = bindingRegistry.get(settings) ?? [];
+  list.push({ row, property });
+  bindingRegistry.set(settings, list);
+}
 
 function addSwitch(
   group: Adw.PreferencesGroup,
@@ -17,6 +25,7 @@ function addSwitch(
 ): void {
   const row = new Adw.SwitchRow({ title, subtitle });
   settings.bind(key, row, "active", Gio.SettingsBindFlags.DEFAULT);
+  trackBinding(settings, row, "active");
   group.add(row);
 }
 
@@ -38,6 +47,7 @@ function addSpin(
   });
   const row = new Adw.SpinRow({ title, subtitle, adjustment });
   settings.bind(key, row, "value", Gio.SettingsBindFlags.DEFAULT);
+  trackBinding(settings, row, "value");
   group.add(row);
 }
 
@@ -49,7 +59,7 @@ function readStats(): Record<string, string | number> | null {
       g_name: "org.gnome.Shell.Extensions.Notman",
       g_object_path: "/org/gnome/Shell/Extensions/Notman",
     });
-    const reply = proxy.call_sync("GetStats", null, Gio.DBusCallFlags.NONE, 2000, null);
+    const reply = proxy.call_sync("GetStats", null, Gio.DBusCallFlags.NONE, 500, null);
     const [dict] = reply.deepUnpack() as [Record<string, GLib.Variant>];
     return {
       activeCount: dict.activeCount.get_int32(),
@@ -70,9 +80,14 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const settings = this.getSettings();
     const page = new Adw.PreferencesPage({ title: _("Notman") });
 
+    const refreshButton = new Gtk.Button({
+      icon_name: "view-refresh-symbolic",
+      tooltip_text: _("Refresh status"),
+    });
     const status = new Adw.PreferencesGroup({
       title: _("Status"),
       description: _("Live information from the running extension."),
+      header_suffix: refreshButton,
     });
     const keptRow = new Adw.ActionRow({ title: _("Kept notifications") });
     const memoryRow = new Adw.ActionRow({ title: _("Thumbnail memory / peak") });
@@ -85,6 +100,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const refreshStatus = (): void => {
       const stats = readStats();
       if (!stats) {
+        status.description = _("Notman is not running. Enable the extension or reload the shell.");
         keptRow.subtitle = _("Unavailable");
         memoryRow.subtitle = "—";
         shellRow.subtitle = "—";
@@ -92,6 +108,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         adapterRow.subtitle = "—";
         return;
       }
+      status.description = _("Live information from the running extension.");
       keptRow.subtitle = String(stats.activeCount);
       memoryRow.subtitle =
         `${(Number(stats.estimatedBytes) / MiB).toFixed(1)} / ` +
@@ -101,6 +118,11 @@ export default class NotmanPreferences extends ExtensionPreferences {
       adapterRow.subtitle = `${stats.adapterId} / ${stats.tier}`;
     };
     refreshStatus();
+    refreshButton.connect("clicked", refreshStatus);
+    const statsTimer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2, () => {
+      refreshStatus();
+      return GLib.SOURCE_CONTINUE;
+    });
 
     const guard = new Adw.PreferencesGroup({
       title: _("Guard"),
@@ -145,7 +167,15 @@ export default class NotmanPreferences extends ExtensionPreferences {
       const selected = settings.get_string("screenshot-thumbnail-mode") === "text-only" ? 1 : 0;
       if (modeRow.selected !== selected) modeRow.selected = selected;
     });
-    window.connect("close-request", () => settings.disconnect(modeChangedId));
+    const cleanup = (): void => {
+      GLib.source_remove(statsTimer);
+      settings.disconnect(modeChangedId);
+      for (const binding of bindingRegistry.get(settings) ?? [])
+        Gio.Settings.unbind(binding.row as never, binding.property);
+      bindingRegistry.delete(settings);
+    };
+    window.connect("close-request", cleanup);
+    window.connect("destroy", cleanup);
     rules.add(modeRow);
     addSpin(
       rules,

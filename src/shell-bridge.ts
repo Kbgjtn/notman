@@ -92,7 +92,6 @@ export function createBridge(
       },
       isCritical: target.urgency === adapter.criticalUrgency(),
       forFeedback: !!target.forFeedback,
-      isTransient: !!target.isTransient,
       isDowngraded: () => downgraded.has(target),
       downgrade: () => {
         if (downgraded.has(target)) return;

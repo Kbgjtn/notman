@@ -6,6 +6,8 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
+MIB = 1024 * 1024
+
 HEADER = (
     "shot",
     "rss_kb",
@@ -46,15 +48,19 @@ for path in sorted(Path("results").glob("*.csv")):
     if case and deltas:
         groups[(case, res)].append((deltas, active, estimated))
 
-print("| Case | Resolution | Runs | Peak RSS delta (kB) | Median RSS delta (kB) | Active notifications | Estimated bytes |")
-print("| ---- | ---------- | ---- | ------------------- | --------------------- | -------------------- | --------------- |")
+print("# Notman benchmark results")
+print()
+print("RSS deltas in kB; negative medians are GC/scheduling noise, not reclaimed memory.")
+print()
+print("| Case | Resolution | Runs | Peak RSS delta (kB) | Median RSS delta (kB) | Active notifications | Est. thumbnails (MiB) |")
+print("| ---- | ---------- | ---- | ------------------- | --------------------- | -------------------- | --------------------- |")
 for (case, res), runs in sorted(groups.items()):
     peaks = [max(d[0]) for d in runs]
     medians = [int(statistics.median(d[0])) for d in runs]
     last_active = [d[1][-1] for d in runs if d[1]]
     last_est = [d[2][-1] for d in runs if d[2]]
     active_text = str(int(statistics.median(last_active))) if last_active else "n/a"
-    est_text = str(int(statistics.median(last_est))) if last_est else "n/a"
+    est_text = f"{statistics.median(last_est) / MIB:.1f}" if last_est else "n/a"
     print(
         f"| {case} | {res} | {len(runs)} | "
         f"{int(statistics.median(peaks))} | {int(statistics.median(medians))} | "

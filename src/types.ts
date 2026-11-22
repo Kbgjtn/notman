@@ -17,7 +17,6 @@ export interface NotificationHandle {
   readonly estimatedBytes: number;
   readonly isCritical: boolean;
   readonly forFeedback: boolean;
-  readonly isTransient: boolean;
   isDowngraded(): boolean;
   downgrade(): void;
   destroy(): boolean;

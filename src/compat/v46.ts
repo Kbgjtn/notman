@@ -35,6 +35,16 @@ export class V46Adapter implements ShellAdapter {
     return active;
   }
 
+  getDateMenuMenu(): unknown {
+    return (
+      (
+        Main.panel as unknown as {
+          statusArea?: { dateMenu?: { menu?: unknown } };
+        } | null
+      )?.statusArea?.dateMenu?.menu ?? null
+    );
+  }
+
   probe(): AdapterCapabilities {
     const tray = Main.messageTray as unknown as {
       getSources?: unknown;
@@ -48,14 +58,13 @@ export class V46Adapter implements ShellAdapter {
     return {
       tray: !!tray && typeof tray.getSources === "function" && typeof tray.connect === "function",
       panel: !!panel,
-      dbus: true,
     };
   }
 
   isScreenshotSource(source: unknown): boolean {
     if (!source || typeof source !== "object") return false;
-    const candidate = source as { iconName?: unknown; title?: unknown };
-    if (candidate.iconName === SCREENSHOT_ICON) return true;
-    return candidate.title === "Screenshot";
+    // The icon is stable and locale-independent. The old title fallback also
+    // matched screencast notifications, which share the title "Screenshot".
+    return (source as { iconName?: unknown }).iconName === SCREENSHOT_ICON;
   }
 }

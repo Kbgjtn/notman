@@ -16,6 +16,7 @@ export default class NotmanExtension extends Extension {
   private _tray: TrayUi | null = null;
 
   enable(): void {
+    if (this._engine || this._disposables || this._tray) this.disable();
     try {
       const versions = this.metadata["shell-version"] as string[] | undefined;
       const version = versions?.[0] ?? "";
@@ -64,7 +65,7 @@ export default class NotmanExtension extends Extension {
       // asynchronous and a failure must still be fully teardown-able.
       this._engine = engine;
       this._disposables = disposables;
-      this._tray = createTrayUi(rawSettings, engine, disposables);
+      this._tray = createTrayUi(adapter, rawSettings, engine, disposables);
       if (!registerDbus(engine, disposables))
         log.warn("extension", "D-Bus API unavailable, guard still active");
       log.info("extension", `enabled adapter=${adapter.id} tier=${tier}`);

@@ -3,7 +3,6 @@ import { V46Adapter } from "./v46.js";
 export interface AdapterCapabilities {
   tray: boolean;
   panel: boolean;
-  dbus: boolean;
 }
 
 export interface ShellAdapter {
@@ -19,6 +18,7 @@ export interface ShellAdapter {
   criticalUrgency(): number;
   dismissedReason(): number;
   getActiveNotifications(): unknown[];
+  getDateMenuMenu(): unknown;
 }
 
 /**

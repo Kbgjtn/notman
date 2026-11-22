@@ -3,23 +3,16 @@ import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import St from "gi://St";
 import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 
+import type { ShellAdapter } from "../compat/adapter.js";
 import type { Disposables } from "../disposables.js";
 import type { Engine } from "../engine.js";
 import { log } from "../log.js";
-import {
-  BUDGET_STEPS,
-  cycleValue,
-  EXPIRE_STEPS,
-  HARD_CAP_STEPS,
-  MAX_COUNT_STEPS,
-  MiB,
-  modeToSwitch,
-  switchToMode,
-} from "./mappings.js";
+import { clampInt, MiB, modeToSwitch, switchToMode } from "./mappings.js";
 
 type Emitter = {
   connect(signal: string, callback: (...args: unknown[]) => void): number;
@@ -38,12 +31,12 @@ type MenuItem = Emitter & {
 
 type Menu = Emitter & {
   addMenuItem(item: unknown, position?: number): void;
+  close(animate: unknown): void;
 };
 
 type StatRow = {
   item: unknown;
   value: { text: string };
-  visible: boolean;
 };
 
 const STATS_INTERVAL_MS = 2000;
@@ -55,19 +48,23 @@ export interface TrayUi {
 }
 
 export function createTrayUi(
+  adapter: ShellAdapter,
   settings: Gio.Settings,
   engine: Engine,
   disposables: Disposables,
 ): TrayUi | null {
   try {
-    const indicator = new PanelMenu.Button(0.5, _("Notman")) as unknown as Emitter & {
+    const indicator = new PanelMenu.Button(
+      0.5,
+      _("Screenshot notification settings"),
+    ) as unknown as Emitter & {
       menu: Menu;
       add_child(child: unknown): void;
       destroy(): void;
     };
     indicator.add_child(
       new St.Icon({
-        icon_name: "preferences-system-symbolic",
+        icon_name: "screenshot-recorded-symbolic",
         style_class: "system-status-icon",
       }),
     );
@@ -82,6 +79,11 @@ export function createTrayUi(
 
     const menu = indicator.menu;
     const refreshers: Array<() => void> = [];
+
+    // PopupMenu closes on any item activation. Shadow that behaviour on this
+    // menu so controls stay open; actions that should close call close() themselves.
+    if (typeof (menu as unknown as { itemActivated?: unknown }).itemActivated === "function")
+      (menu as unknown as { itemActivated(): void }).itemActivated = () => {};
 
     const watch = (key: string, refresh: () => void): void => {
       refreshers.push(refresh);
@@ -120,22 +122,86 @@ export function createTrayUi(
       menu.addMenuItem(item);
     };
 
-    const addCycle = (title: string, key: string, steps: readonly number[]): void => {
-      const render = (value: number): string => `${title}: ${value}`;
-      const item = new PopupMenu.PopupMenuItem(
-        render(settings.get_int(key)),
-      ) as unknown as MenuItem;
-      watch(key, () => {
-        item.label.text = render(settings.get_int(key));
+    const addSpinRow = (
+      title: string,
+      key: string,
+      step: number,
+      unit: string,
+      zeroLabel: string,
+    ): void => {
+      type Stepper = Emitter & {
+        actor: { add_child(child: unknown): void };
+        accessible_name: string;
+      };
+      const item = new PopupMenu.PopupBaseMenuItem({
+        reactive: true,
+        can_focus: true,
+      }) as unknown as Stepper;
+      const [, rangeVariant] = settings.get_range(key).deepUnpack() as [string, GLib.Variant];
+      const [min, max] = rangeVariant.deepUnpack() as [number, number];
+      const render = (value: number): string => (value === 0 ? zeroLabel : `${value}${unit}`);
+      const nameLabel = new St.Label({ text: title, opacity: 170 });
+      const valueLabel = new St.Label({
+        text: render(settings.get_int(key)),
+        x_expand: true,
+        x_align: Clutter.ActorAlign.END,
       });
-      item.connect("activate", () => {
+      const minus = new St.Button({
+        style_class: "icon-button",
+        can_focus: true,
+        child: new St.Icon({ icon_name: "list-remove-symbolic" }),
+      }) as unknown as Emitter & { accessible_name: string };
+      const plus = new St.Button({
+        style_class: "icon-button",
+        can_focus: true,
+        child: new St.Icon({ icon_name: "list-add-symbolic" }),
+      }) as unknown as Emitter & { accessible_name: string };
+      minus.accessible_name = `${_("Decrease")} ${title}`;
+      plus.accessible_name = `${_("Increase")} ${title}`;
+      const box = new St.BoxLayout({ x_expand: true }) as unknown as {
+        add_child(child: unknown): void;
+        layout_manager: { spacing: number };
+      };
+      box.layout_manager.spacing = 12;
+      box.add_child(nameLabel);
+      box.add_child(valueLabel);
+      box.add_child(minus);
+      box.add_child(plus);
+      item.actor.add_child(box);
+      menu.addMenuItem(item);
+
+      const syncName = (): void => {
+        item.accessible_name = `${title}: ${render(settings.get_int(key))}`;
+      };
+      watch(key, () => {
+        valueLabel.text = render(settings.get_int(key));
+        syncName();
+      });
+      syncName();
+
+      const change = (delta: number): void => {
         try {
-          settings.set_int(key, cycleValue(settings.get_int(key), steps));
+          settings.set_int(key, clampInt(settings.get_int(key) + delta, min, max, min));
         } catch (e) {
           log.err("tray", `could not update ${key}`, e);
         }
+      };
+      minus.connect("clicked", () => change(-step));
+      plus.connect("clicked", () => change(step));
+      item.connect("activate", () => change(step));
+      item.connect("key-press-event", (_actor: unknown, rawEvent: unknown) => {
+        const event = rawEvent as { get_key_symbol(): number };
+        const symbol = event.get_key_symbol();
+        if (symbol === Clutter.KEY_Left) {
+          change(-step);
+          return Clutter.EVENT_STOP;
+        }
+        if (symbol === Clutter.KEY_Right) {
+          change(step);
+          return Clutter.EVENT_STOP;
+        }
+        return Clutter.EVENT_PROPAGATE;
       });
-      menu.addMenuItem(item);
     };
 
     const addStatRow = (title: string): StatRow => {
@@ -151,7 +217,7 @@ export function createTrayUi(
       };
       const label = new St.Label({
         text: title,
-        style_class: "dim-label",
+        opacity: 170,
       });
       const value = new St.Label({
         text: "",
@@ -162,11 +228,11 @@ export function createTrayUi(
       box.add_child(value);
       item.actor.add_child(box);
       menu.addMenuItem(item);
-      return { item, value: value as unknown as { text: string }, visible: true };
+      return { item, value: value as unknown as { text: string } };
     };
 
     addSwitch(
-      _("Guard"),
+      _("Enable guard"),
       "guard-enabled",
       () => settings.get_boolean("guard-enabled"),
       (value) => settings.set_boolean("guard-enabled", value),
@@ -184,28 +250,29 @@ export function createTrayUi(
       (value) => settings.set_string("screenshot-thumbnail-mode", switchToMode(value)),
     );
     menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-    addCycle(_("Max retained"), "screenshot-max-count", MAX_COUNT_STEPS);
-    addCycle(_("Expire seconds"), "screenshot-expire-seconds", EXPIRE_STEPS);
-    addCycle(_("Budget MiB"), "screenshot-memory-budget-mb", BUDGET_STEPS);
-    addCycle(_("Hard cap"), "emergency-hard-cap", HARD_CAP_STEPS);
-    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    addSpinRow(_("Max retained"), "screenshot-max-count", 1, "", _("Unlimited"));
+    addSpinRow(_("Expire after"), "screenshot-expire-seconds", 1, " s", _("Off"));
+    addSpinRow(_("Memory budget"), "screenshot-memory-budget-mb", 8, " MiB", _("Off"));
+    addSpinRow(_("Hard cap"), "emergency-hard-cap", 8, "", _("Off"));
+    const statsSeparator = new PopupMenu.PopupSeparatorMenuItem();
+    menu.addMenuItem(statsSeparator);
 
     const keptRow = addStatRow(_("Kept notifications"));
-    const memoryRow = addStatRow(_("Thumbnail memory"));
+    const memoryRow = addStatRow(_("Thumbnail memory / peak"));
     const rssRow = addStatRow(_("Shell memory"));
     const prunedRow = addStatRow(_("Pruned"));
     const statsRows = [keptRow, memoryRow, rssRow, prunedRow];
 
     const setStatsVisible = (visible: boolean): void => {
-      for (const row of statsRows) {
-        row.visible = visible;
-        (row.item as { visible: boolean }).visible = visible;
-      }
+      for (const row of statsRows) (row.item as { visible: boolean }).visible = visible;
+      (statsSeparator as { visible: boolean }).visible = visible;
     };
     watch("show-stats", () => setStatsVisible(settings.get_boolean("show-stats")));
     setStatsVisible(settings.get_boolean("show-stats"));
-
-    const clearItem = new PopupMenu.PopupMenuItem(_("Clear screenshots")) as unknown as MenuItem;
+    const clearItem = new PopupMenu.PopupMenuItem(
+      _("Clear screenshot notifications"),
+    ) as unknown as MenuItem;
+    // Intentionally stays open so the stats rows show the result immediately.
     clearItem.connect("activate", () => {
       try {
         engine.clearScreenshots();
@@ -215,8 +282,9 @@ export function createTrayUi(
     });
     menu.addMenuItem(clearItem);
 
-    const prefsItem = new PopupMenu.PopupMenuItem(_("Extension Settings…")) as unknown as MenuItem;
+    const prefsItem = new PopupMenu.PopupMenuItem(_("Extension settings…")) as unknown as MenuItem;
     prefsItem.connect("activate", () => {
+      menu.close(BoxPointer.PopupAnimation.FULL);
       Gio.DBus.session.call(
         "org.gnome.Shell",
         "/org/gnome/Shell",
@@ -258,12 +326,9 @@ export function createTrayUi(
 
     const openId = menu.connect("open-state-changed", (...args: unknown[]) => {
       try {
-        if (args[1]) {
-          for (const refresh of refreshers) refresh();
-          if (settings.get_boolean("clear-on-panel-open")) engine.clearScreenshots();
-        }
+        if (args[1]) for (const refresh of refreshers) refresh();
       } catch (e) {
-        log.err("tray", "clear-on-open failed", e);
+        log.err("tray", "refresh failed", e);
       }
     });
     disposables.add(() => {
@@ -273,6 +338,25 @@ export function createTrayUi(
         // Already gone.
       }
     });
+
+    const dateMenu = adapter.getDateMenuMenu();
+    if (dateMenu && typeof (dateMenu as Emitter).connect === "function") {
+      const emitter = dateMenu as Emitter;
+      const dateOpenId = emitter.connect("open-state-changed", (...args: unknown[]) => {
+        try {
+          if (args[1] && settings.get_boolean("clear-on-panel-open")) engine.clearScreenshots();
+        } catch (e) {
+          log.err("tray", "clear-on-panel-open failed", e);
+        }
+      });
+      disposables.add(() => {
+        try {
+          emitter.disconnect(dateOpenId);
+        } catch {
+          // Already gone.
+        }
+      });
+    }
 
     log.info("tray", "status indicator added");
     return {

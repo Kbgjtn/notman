@@ -102,7 +102,7 @@ export function makeBridge(
   byNotification: Map<unknown, number>,
 ): Bridge {
   return {
-    capabilities: { tray: true, panel: true, dbus: true },
+    capabilities: { tray: true, panel: true },
     start: () => true,
     sourceKeyFor: () => "screenshot",
     getExistingScreenshotNotifications: () => [],
