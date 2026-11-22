@@ -8,6 +8,11 @@ export class Disposables {
     this._items.push(dispose);
   }
 
+  remove(dispose: () => void): void {
+    const index = this._items.indexOf(dispose);
+    if (index >= 0) this._items.splice(index, 1);
+  }
+
   get size(): number {
     return this._items.length;
   }

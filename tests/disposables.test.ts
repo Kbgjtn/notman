@@ -38,6 +38,20 @@ describe("Disposables", () => {
     expect(logError.mock.calls[0][1]).toBe("notman: error during teardown");
   });
 
+  it("can remove a disposer before teardown", () => {
+    const calls: number[] = [];
+    const disposables = new Disposables();
+    const first = () => calls.push(1);
+    disposables.add(first);
+    disposables.add(() => calls.push(2));
+
+    disposables.remove(first);
+    disposables.dispose();
+
+    expect(calls).toEqual([2]);
+    expect(disposables.size).toBe(0);
+  });
+
   it("is safe to dispose an empty registry", () => {
     expect(() => new Disposables().dispose()).not.toThrow();
   });

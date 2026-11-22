@@ -72,7 +72,6 @@ export class Engine {
   }
 
   sweep(): void {
-    const handles = [...this._handles.values()];
     const context: RuleContext = {
       nowMs: Date.now(),
       settings: this._settings.read(),
@@ -80,6 +79,8 @@ export class Engine {
       log: (message) => log(`notman: ${message}`),
     };
     for (const rule of this._rules) {
+      // Rules may destroy handles, so each one sees the surviving set.
+      const handles = [...this._handles.values()];
       const outcome = rule.evaluate(handles, context);
       for (const handle of outcome.downgrade) {
         try {
@@ -95,14 +96,16 @@ export class Engine {
 
   private destroyHandle(handle: NotificationHandle): void {
     if (this._pending.has(handle.id)) return;
-    this._pending.add(handle.id);
-    this._handles.delete(handle.id);
-    this._stats.pruned();
+    let destroyed = false;
     try {
-      handle.destroy();
+      destroyed = handle.destroy();
     } catch (e) {
       logErr(e, "notman: destroying notification failed");
     }
+    if (!destroyed) return;
+    this._pending.add(handle.id);
+    this._handles.delete(handle.id);
+    this._stats.pruned();
   }
 
   getStats(): StatsSnapshot {

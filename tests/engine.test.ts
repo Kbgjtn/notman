@@ -203,4 +203,52 @@ describe("Engine", () => {
     expect(settings.notifyEnabled).toBe(false);
     expect(settings.maxCount).toBe(7);
   });
+
+  it("applies expiry and max-count rules across scheduled sweeps", () => {
+    const now = Date.now();
+    const settings = makeSettings({ expireSeconds: 10, maxCount: 1 });
+    const old = new FakeHandle(1, "screenshot", now - 20_000);
+    const fresh = new FakeHandle(2, "screenshot", now);
+    const notifications = new Map<unknown, number>([
+      [{}, 1],
+      [{}, 2],
+    ]);
+    const [oldNotification, freshNotification] = [...notifications.keys()];
+    const bridge = makeBridge(
+      new Map([
+        [1, old],
+        [2, fresh],
+      ]),
+      notifications,
+    );
+    const scheduler = new FakeScheduler();
+    const engine = new Engine(makeSettingsStore(settings), bridge, "v46", 2, scheduler);
+
+    engine.onNotificationAdded(oldNotification);
+    engine.onNotificationAdded(freshNotification);
+    engine.start();
+    scheduler.tick();
+
+    expect(old.destroyed).toBe(true);
+    expect(fresh.destroyed).toBe(false);
+    expect(engine.getStats().activeCount).toBe(1);
+  });
+
+  it("does not count a failed destroy as pruned", () => {
+    const handle = new FakeHandle(1, "screenshot", 0, 0, false, false, true, true);
+    const notification = {};
+    const bridge = makeBridge(new Map([[1, handle]]), new Map([[notification, 1]]));
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ notifyEnabled: false })),
+      bridge,
+      "v46",
+      2,
+      new FakeScheduler(),
+    );
+
+    expect(() => engine.onNotificationAdded(notification)).not.toThrow();
+    expect(handle.destroyed).toBe(false);
+    expect(engine.getStats().activeCount).toBe(1);
+    expect(engine.getStats().prunedCount).toBe(0);
+  });
 });

@@ -1,8 +1,8 @@
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
+import { estimateContentBytes } from "./byte-estimate.js";
 import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
 import type { Disposables } from "./disposables.js";
 import { logErr } from "./log.js";
@@ -49,6 +49,7 @@ export function createBridge(
   const destroyed = new WeakSet<object>();
   const downgraded = new WeakSet<object>();
   const seenSources = new WeakSet<object>();
+  const attachedNotifications = new WeakSet<object>();
   const pendingDestroys = new Set<number>();
   let nextId = 1;
   let stopped = false;
@@ -56,24 +57,6 @@ export function createBridge(
   const idFor = (notification: unknown): number | null => {
     if (!notification || typeof notification !== "object") return null;
     return ids.get(notification) ?? null;
-  };
-
-  const estimateBytes = (icon: unknown): number => {
-    if (!icon || typeof icon !== "object") return 0;
-    const sized = icon as { get_preferred_size?: () => unknown };
-    if (typeof sized.get_preferred_size !== "function") return 0;
-    try {
-      const size = sized.get_preferred_size();
-      if (Array.isArray(size) && size.length >= 2) {
-        const width = Number(size[0]);
-        const height = Number(size[1]);
-        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0)
-          return Math.round(width * height * 4);
-      }
-    } catch {
-      // Unknown icon implementation: fall back to count-only accounting.
-    }
-    return 0;
   };
 
   const decode = (bytes: Uint8Array): string => {
@@ -98,8 +81,8 @@ export function createBridge(
       id,
       sourceKey,
       receivedAtMs: Date.now(),
-      estimatedBytes: estimateBytes(target.gicon),
-      isCritical: target.urgency === MessageTray.Urgency.CRITICAL,
+      estimatedBytes: estimateContentBytes(target.gicon),
+      isCritical: target.urgency === adapter.criticalUrgency(),
       forFeedback: !!target.forFeedback,
       isTransient: !!target.isTransient,
       isDowngraded: () => downgraded.has(target),
@@ -115,18 +98,20 @@ export function createBridge(
         }
       },
       destroy: () => {
-        if (destroyed.has(target) || stopped) return;
+        if (destroyed.has(target) || stopped) return false;
         destroyed.add(target);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           pendingDestroys.delete(sourceId);
           try {
-            target.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
+            target.destroy(adapter.dismissedReason());
           } catch (e) {
             logErr(e, "notman: could not destroy notification");
           }
           return GLib.SOURCE_REMOVE;
         });
+        if (sourceId === 0) return false;
         pendingDestroys.add(sourceId);
+        return true;
       },
     };
   };
@@ -137,16 +122,23 @@ export function createBridge(
     onDestroyed: (notification: unknown) => void,
   ): void => {
     if (!notification || typeof notification !== "object") return;
+    if (attachedNotifications.has(notification)) return;
     const emitter = notification as SignalEmitter;
     if (typeof emitter.connect !== "function") return;
-    const signalId = emitter.connect("destroy", () => onDestroyed(notification));
-    disposables.add(() => {
+    attachedNotifications.add(notification);
+
+    const signalId = emitter.connect(adapter.signals.destroy, () => {
+      disposables.remove(dispose);
+      onDestroyed(notification);
+    });
+    const dispose = (): void => {
       try {
         emitter.disconnect(signalId);
       } catch {
         // Notification may already be gone.
       }
-    });
+    };
+    disposables.add(dispose);
     onAdded(notification);
   };
 
@@ -160,7 +152,8 @@ export function createBridge(
     if (!adapter.isScreenshotSource(source)) return;
     const emitter = source as SignalEmitter;
     if (typeof emitter.connect !== "function") return;
-    const signalId = emitter.connect("notification-added", (...args: unknown[]) => {
+
+    const signalId = emitter.connect(adapter.signals.notificationAdded, (...args: unknown[]) => {
       attachNotification(args[0], onAdded, onDestroyed);
     });
     disposables.add(() => {
@@ -170,13 +163,19 @@ export function createBridge(
         // Source may already be gone.
       }
     });
+
+    // Adopt notifications that existed before the extension was enabled.
+    const existing = (source as { notifications?: unknown[] }).notifications;
+    if (Array.isArray(existing)) {
+      for (const notification of existing) attachNotification(notification, onAdded, onDestroyed);
+    }
   };
 
   return {
     capabilities,
 
     start(onAdded, onDestroyed) {
-      const sourceAddedId = tray.connect("source-added", (...args: unknown[]) => {
+      const sourceAddedId = tray.connect(adapter.signals.sourceAdded, (...args: unknown[]) => {
         observeSource(args[0], onAdded, onDestroyed);
       });
       disposables.add(() => {
@@ -200,9 +199,11 @@ export function createBridge(
     idFor,
 
     currentlyShownId() {
-      const shown = (Main.messageTray as unknown as { _notification?: unknown } | null)
-        ?._notification;
-      return shown ? idFor(shown) : null;
+      for (const notification of adapter.getActiveNotifications()) {
+        const id = idFor(notification);
+        if (id !== null) return id;
+      }
+      return null;
     },
 
     readRssBytes() {

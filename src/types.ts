@@ -20,7 +20,7 @@ export interface NotificationHandle {
   readonly isTransient: boolean;
   isDowngraded(): boolean;
   downgrade(): void;
-  destroy(): void;
+  destroy(): boolean;
 }
 
 export interface RuleContext {

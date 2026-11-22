@@ -1,0 +1,40 @@
+import { describe, expect, it } from "vitest";
+
+import { estimateContentBytes } from "../src/byte-estimate.js";
+
+describe("estimateContentBytes", () => {
+  it("reads the Clutter.Content triple [success, width, height]", () => {
+    const icon = { get_preferred_size: () => [true, 3840, 2160] };
+    expect(estimateContentBytes(icon)).toBe(3840 * 2160 * 4);
+  });
+
+  it("returns zero when the content reports no preferred size", () => {
+    const icon = { get_preferred_size: () => [false, 3840, 2160] };
+    expect(estimateContentBytes(icon)).toBe(0);
+  });
+
+  it("accepts the simpler [width, height] shape defensively", () => {
+    const icon = { get_preferred_size: () => [1920, 1080] };
+    expect(estimateContentBytes(icon)).toBe(1920 * 1080 * 4);
+  });
+
+  it("returns zero for missing, non-object or malformed icons", () => {
+    expect(estimateContentBytes(null)).toBe(0);
+    expect(estimateContentBytes(undefined)).toBe(0);
+    expect(estimateContentBytes(42)).toBe(0);
+    expect(estimateContentBytes({})).toBe(0);
+    expect(estimateContentBytes({ get_preferred_size: () => "bad" })).toBe(0);
+  });
+
+  it("returns zero for non-finite dimensions and does not throw on failure", () => {
+    expect(estimateContentBytes({ get_preferred_size: () => [true, 0, 2160] })).toBe(0);
+    expect(estimateContentBytes({ get_preferred_size: () => [true, NaN, 10] })).toBe(0);
+    expect(
+      estimateContentBytes({
+        get_preferred_size: () => {
+          throw new Error("broken content");
+        },
+      }),
+    ).toBe(0);
+  });
+});

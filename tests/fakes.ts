@@ -38,6 +38,7 @@ export class FakeHandle implements NotificationHandle {
     readonly isCritical = false,
     readonly forFeedback = false,
     readonly isTransient = true,
+    readonly destroyThrows = false,
   ) {}
 
   isDowngraded(): boolean {
@@ -49,18 +50,31 @@ export class FakeHandle implements NotificationHandle {
     this.downgradeCalls++;
   }
 
-  destroy(): void {
-    this.destroyed = true;
+  destroy(): boolean {
     this.destroyCalls++;
+    if (this.destroyThrows) throw new Error("destroy failed");
+    this.destroyed = true;
+    return true;
   }
 }
 
 export class FakeScheduler implements Scheduler {
-  every(_intervalMs: number, _callback: () => void): number {
-    return 1;
+  private readonly _callbacks = new Map<number, () => void>();
+  private _nextId = 1;
+
+  every(_intervalMs: number, callback: () => void): number {
+    const id = this._nextId++;
+    this._callbacks.set(id, callback);
+    return id;
   }
 
-  cancel(_id: number): void {}
+  cancel(id: number): void {
+    this._callbacks.delete(id);
+  }
+
+  tick(): void {
+    for (const callback of [...this._callbacks.values()]) callback();
+  }
 }
 
 export function makeSettingsStore(settings: RuleSettings): SettingsStore {
