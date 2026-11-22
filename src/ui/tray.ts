@@ -63,7 +63,7 @@ export class TrayIndicator {
     const menu = this._indicator.menu;
 
     this.addSwitch(
-      _("Enable guard"),
+      _("Manage notifications"),
       SettingKey.GuardEnabled,
       () => this._settings.get_boolean(SettingKey.GuardEnabled),
       (value) => this._settings.set_boolean(SettingKey.GuardEnabled, value),
@@ -169,7 +169,7 @@ export class TrayIndicator {
   }
 
   private addThumbnailModeMenu(): PopupMenu.PopupSubMenuMenuItem {
-    const submenu = new PopupMenu.PopupSubMenuMenuItem(_("Thumbnails"));
+    const submenu = new PopupMenu.PopupSubMenuMenuItem(_("Previews"));
     const choices: Array<{
       mode: ThumbnailMode;
       shortLabel: string;
@@ -178,12 +178,12 @@ export class TrayIndicator {
       {
         mode: ThumbnailMode.Full,
         shortLabel: _("Full"),
-        item: new PopupMenu.PopupMenuItem(_("Full thumbnail")),
+        item: new PopupMenu.PopupMenuItem(_("Full size")),
       },
       {
         mode: ThumbnailMode.Compact,
         shortLabel: _("Compact"),
-        item: new PopupMenu.PopupMenuItem(_("Compact thumbnail")),
+        item: new PopupMenu.PopupMenuItem(_("Compact")),
       },
       {
         mode: ThumbnailMode.TextOnly,
@@ -213,7 +213,7 @@ export class TrayIndicator {
         choice.item.setOrnament(isCurrent ? PopupMenu.Ornament.DOT : PopupMenu.Ornament.NONE);
         if (isCurrent) activeLabel = choice.shortLabel;
       }
-      submenu.label.text = `${_("Thumbnails")}: ${activeLabel}`;
+      submenu.label.text = `${_("Previews")}: ${activeLabel}`;
     };
 
     refresh();
@@ -244,13 +244,13 @@ export class TrayIndicator {
 
   private refreshStatus(): void {
     if (!this._settings.get_boolean(SettingKey.GuardEnabled)) {
-      this._statusSeparator.label.text = _("Guard paused");
+      this._statusSeparator.label.text = _("Paused");
       return;
     }
     const stats = this._engine.getStats();
-    const parts = [`${stats.activeCount} ${_("tracked")}`];
+    const parts = [`${stats.activeCount} ${_("active")}`];
     if (stats.estimatedBytes > 0) parts.push(formatBytes(stats.estimatedBytes));
-    if (stats.prunedCount > 0) parts.push(`${stats.prunedCount} ${_("pruned")}`);
+    if (stats.prunedCount > 0) parts.push(`${stats.prunedCount} ${_("cleaned")}`);
     this._statusSeparator.label.text = parts.join(" · ");
   }
 

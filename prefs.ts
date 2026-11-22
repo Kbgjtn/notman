@@ -137,8 +137,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const statusGroup = new Adw.PreferencesGroup({
       title: _("Status"),
     });
-    const activeRow = new Adw.ActionRow({ title: _("Tracked notifications") });
-    const prunedRow = new Adw.ActionRow({ title: _("Pruned this session") });
+    const activeRow = new Adw.ActionRow({ title: _("Active notifications") });
+    const prunedRow = new Adw.ActionRow({ title: _("Cleaned this session") });
     statusGroup.add(activeRow);
     statusGroup.add(prunedRow);
     generalPage.add(statusGroup);
@@ -148,7 +148,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
         if (disposed) return;
         if (!stats) {
           statusGroup.description = _(
-            "Notman is not active. Enable the extension or reload GNOME Shell.",
+            "Notman isn't running right now. Enable the extension or reload GNOME Shell.",
           );
           activeRow.subtitle = _("Unavailable");
           prunedRow.subtitle = "—";
@@ -177,14 +177,14 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSwitch(
       generalGroup,
       SettingKey.GuardEnabled,
-      _("Enable guard"),
-      _("Turn off to let GNOME handle notifications unchanged."),
+      _("Manage notifications"),
+      _("Pause Notman to let GNOME handle notifications on its own."),
     );
     addSwitch(
       generalGroup,
       SettingKey.ClearOnPanelOpen,
-      _("Clear when notification list opens"),
-      _("Remove kept screenshot notifications when opening the calendar menu."),
+      _("Clear screenshots when opening the panel"),
+      _("Automatically dismiss screenshot notifications when you open the calendar drawer."),
     );
     generalPage.add(generalGroup);
 
@@ -194,8 +194,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSwitch(
       topBarGroup,
       SettingKey.ShowIndicator,
-      _("Show top-bar indicator"),
-      _("Display quick toggles and live status in the top bar."),
+      _("Show top-bar icon"),
+      _("Add a quick menu and live counter to the top bar."),
     );
 
     const positions = new Gtk.StringList({});
@@ -204,7 +204,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     positions.append(_("Right"));
     const positionRow = new Adw.ComboRow({
       title: _("Position"),
-      subtitle: _("Position of the indicator in the top bar."),
+      subtitle: _("Where the icon sits in the top bar."),
       model: positions,
     });
     const readPositionIndex = (): number => {
@@ -227,8 +227,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const indexRow = addSpin(
       topBarGroup,
       SettingKey.IndicatorIndex,
-      _("Index"),
-      _("Order of the indicator within the chosen panel section."),
+      _("Order"),
+      _("Fine-tune the icon's placement within that section."),
       0,
       20,
       1,
@@ -240,31 +240,29 @@ export default class NotmanPreferences extends ExtensionPreferences {
 
     const screenshotsPage = new Adw.PreferencesPage({
       title: _("Screenshots"),
-      icon_name: "screenshot-recorded-symbolic",
+      icon_name: "camera-photo-symbolic",
     });
 
     const rulesGroup = new Adw.PreferencesGroup({
       title: _("Screenshot notifications"),
-      description: _("Zero disables an individual limit."),
+      description: _("Set a limit to 0 to turn it off."),
     });
     bind(SettingKey.GuardEnabled, rulesGroup, "sensitive", Gio.SettingsBindFlags.GET);
 
     addSwitch(
       rulesGroup,
       SettingKey.ScreenshotNotifyEnabled,
-      _("Allow screenshot notifications"),
-      _("Turn off to discard screenshot notifications immediately."),
+      _("Show screenshot notifications"),
+      _("Turn off to dismiss screenshot notifications right away."),
     );
 
     const modes = new Gtk.StringList({});
-    modes.append(_("Full thumbnail"));
-    modes.append(_("Compact thumbnail"));
+    modes.append(_("Full size"));
+    modes.append(_("Compact"));
     modes.append(_("Text only"));
     const modeRow = new Adw.ComboRow({
-      title: _("Thumbnail mode"),
-      subtitle: _(
-        "Compact downscales previews to save memory; text only removes the image immediately.",
-      ),
+      title: _("Preview style"),
+      subtitle: _("Compact shrinks previews to save memory; text only hides the image."),
       model: modes,
     });
     const readModeIndex = (): number => {
@@ -287,8 +285,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const maxCountRow = addSpin(
       rulesGroup,
       SettingKey.ScreenshotMaxCount,
-      _("Maximum retained"),
-      _("Oldest screenshot notifications are removed beyond this count."),
+      _("Max kept"),
+      _("Older screenshots are cleared once you go past this number."),
       0,
       100,
       1,
@@ -296,8 +294,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const expireRow = addSpin(
       rulesGroup,
       SettingKey.ScreenshotExpireSeconds,
-      _("Expire after (seconds)"),
-      _("Remove screenshot notifications after this many seconds."),
+      _("Auto-dismiss after (seconds)"),
+      _("Clear screenshot notifications once they're this old."),
       0,
       300,
       1,
@@ -305,8 +303,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     const budgetRow = addSpin(
       rulesGroup,
       SettingKey.ScreenshotMemoryBudgetMb,
-      _("Memory budget (MiB)"),
-      _("Prune oldest screenshots when estimated thumbnail memory exceeds this limit."),
+      _("Memory limit (MiB)"),
+      _("Clear older screenshots when preview memory goes over this limit."),
       0,
       512,
       8,
@@ -329,8 +327,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSwitch(
       screencastGroup,
       SettingKey.ScreencastNotifyEnabled,
-      _("Allow screencast notifications"),
-      _("Turn off to discard screencast notifications immediately."),
+      _("Show screencast notifications"),
+      _("Turn off to dismiss screen-recording notifications right away."),
     );
     screenshotsPage.add(screencastGroup);
 
@@ -340,9 +338,9 @@ export default class NotmanPreferences extends ExtensionPreferences {
     });
 
     const transientGroup = new Adw.PreferencesGroup({
-      title: _("Transient notifications"),
+      title: _("Temporary notifications"),
       description: _(
-        "Clean up transient notifications from other apps that linger in Do Not Disturb.",
+        "Clean up short-lived alerts from other apps that get stuck during Do Not Disturb.",
       ),
     });
     bind(SettingKey.GuardEnabled, transientGroup, "sensitive", Gio.SettingsBindFlags.GET);
@@ -350,20 +348,20 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSwitch(
       transientGroup,
       SettingKey.TransientExpireEnabled,
-      _("Expire transient notifications"),
-      _("Automatically remove transient notifications from other apps after a delay."),
+      _("Auto-clear temporary notifications"),
+      _("Dismiss short-lived alerts from other apps after a short wait."),
     );
     const transientDndRow = addSwitch(
       transientGroup,
       SettingKey.TransientDndOnly,
-      _("Only in Do Not Disturb"),
-      _("Apply expiry only while notification banners are suppressed."),
+      _("Only during Do Not Disturb"),
+      _("Run this cleanup only when notification banners are muted."),
     );
     const transientExpireRow = addSpin(
       transientGroup,
       SettingKey.TransientExpireSeconds,
-      _("Expire after (seconds)"),
-      _("Remove transient notifications after this many seconds."),
+      _("Clear after (seconds)"),
+      _("How long to wait before dismissing temporary alerts."),
       5,
       300,
       5,
@@ -374,16 +372,16 @@ export default class NotmanPreferences extends ExtensionPreferences {
     retentionPage.add(transientGroup);
 
     const retentionGroup = new Adw.PreferencesGroup({
-      title: _("Global retention"),
-      description: _("Limits applied across all apps. Zero disables an individual limit."),
+      title: _("All apps"),
+      description: _("Applies to all apps. Set a limit to 0 to turn it off."),
     });
     bind(SettingKey.GuardEnabled, retentionGroup, "sensitive", Gio.SettingsBindFlags.GET);
 
     addSpin(
       retentionGroup,
       SettingKey.GlobalMaxCount,
-      _("Maximum notifications"),
-      _("Oldest non-critical notifications across all apps are removed beyond this count."),
+      _("Max total notifications"),
+      _("Clear the oldest non-critical notifications past this total."),
       0,
       100,
       1,
@@ -391,8 +389,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSpin(
       retentionGroup,
       SettingKey.GlobalExpireMinutes,
-      _("Expire after (minutes)"),
-      _("Remove non-critical notifications older than this many minutes."),
+      _("Auto-dismiss after (minutes)"),
+      _("Clear non-critical notifications once they're this old."),
       0,
       1440,
       5,
@@ -410,8 +408,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSpin(
       advancedGroup,
       SettingKey.EmergencyHardCap,
-      _("Emergency hard cap"),
-      _("Last-resort limit on tracked notifications even when other limits are disabled."),
+      _("Safety cap"),
+      _("Hard ceiling on screenshots and temporary alerts even if other limits are off."),
       0,
       256,
       8,
@@ -419,8 +417,8 @@ export default class NotmanPreferences extends ExtensionPreferences {
     addSwitch(
       advancedGroup,
       SettingKey.DebugLogging,
-      _("Verbose logging"),
-      _("Write detailed tracking logs to the system journal."),
+      _("Debug logging"),
+      _("Write detailed activity logs to the system journal."),
     );
     aboutPage.add(advancedGroup);
 
