@@ -1,6 +1,7 @@
 import type Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import St from "gi://St";
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
@@ -56,7 +57,7 @@ export function createTrayUi(
     indicator.add_child(
       new St.Icon({
         icon_name: "preferences-system-symbolic",
-        style_class: "system-status-icon notman-status-icon",
+        style_class: "system-status-icon",
       }),
     );
 
@@ -97,26 +98,26 @@ export function createTrayUi(
     };
 
     addSwitch(
-      "Guard",
+      _("Guard"),
       () => settings.get_boolean("guard-enabled"),
       (value) => settings.set_boolean("guard-enabled", value),
     );
     addSwitch(
-      "Screenshot notifications",
+      _("Screenshot notifications"),
       () => settings.get_boolean("screenshot-notify-enabled"),
       (value) => settings.set_boolean("screenshot-notify-enabled", value),
     );
     addSwitch(
-      "Text-only thumbnails",
+      _("Text-only thumbnails"),
       () => modeToSwitch(settings.get_string("screenshot-thumbnail-mode")),
       (value) => settings.set_string("screenshot-thumbnail-mode", switchToMode(value)),
     );
-    addCycle("Max retained", "screenshot-max-count", MAX_COUNT_STEPS);
-    addCycle("Expire seconds", "screenshot-expire-seconds", EXPIRE_STEPS);
-    addCycle("Budget MiB", "screenshot-memory-budget-mb", BUDGET_STEPS);
-    addCycle("Hard cap", "emergency-hard-cap", HARD_CAP_STEPS);
+    addCycle(_("Max retained"), "screenshot-max-count", MAX_COUNT_STEPS);
+    addCycle(_("Expire seconds"), "screenshot-expire-seconds", EXPIRE_STEPS);
+    addCycle(_("Budget MiB"), "screenshot-memory-budget-mb", BUDGET_STEPS);
+    addCycle(_("Hard cap"), "emergency-hard-cap", HARD_CAP_STEPS);
 
-    const clearItem = new PopupMenu.PopupMenuItem("Clear screenshots") as unknown as MenuItem;
+    const clearItem = new PopupMenu.PopupMenuItem(_("Clear screenshots")) as unknown as MenuItem;
     clearItem.connect("activate", () => {
       try {
         engine.clearScreenshots();

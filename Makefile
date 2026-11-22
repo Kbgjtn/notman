@@ -33,7 +33,6 @@ dist/extension.js dist/prefs.js &: $(STAMP) $(TS_SOURCES)
 	cp -R dist/src dist.new/ 2>/dev/null || true
 	cp metadata.json dist.new/
 	cp -R schemas dist.new/
-	@if [ -f stylesheet.css ]; then cp stylesheet.css dist.new/; fi
 	glib-compile-schemas dist.new/schemas
 	@if [ -d dist ]; then mv dist dist.old; fi
 	mv dist.new dist
