@@ -54,13 +54,13 @@ button.notman-mode-card:checked {
   border-right: none;
 }
 .notman-stat-active .notman-stat-accent {
-  color: #38bdf8;
+  color: @accent_color;
 }
 .notman-stat-cleaned .notman-stat-accent {
-  color: #fbbf24;
+  color: @warning_color;
 }
 .notman-stat-saved .notman-stat-accent {
-  color: #34d399;
+  color: @success_color;
 }
 `;
 
