@@ -5,7 +5,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { estimateContentBytes } from "./byte-estimate.js";
 import type { AdapterCapabilities, ShellAdapter } from "./compat/adapter.js";
 import type { Disposables } from "./disposables.js";
-import { logErr } from "./log.js";
+import { debugLog, logErr } from "./log.js";
 import type { NotificationHandle } from "./types.js";
 
 type SignalEmitter = {
@@ -77,11 +77,15 @@ export function createBridge(
       id = nextId++;
       ids.set(target, id);
     }
+    const estimatedBytes = estimateContentBytes(target.gicon);
+    debugLog(
+      `handle id=${id} sourceKey=${sourceKey} bytes=${estimatedBytes} critical=${target.urgency === adapter.criticalUrgency()}`,
+    );
     return {
       id,
       sourceKey,
       receivedAtMs: Date.now(),
-      estimatedBytes: estimateContentBytes(target.gicon),
+      estimatedBytes,
       isCritical: target.urgency === adapter.criticalUrgency(),
       forFeedback: !!target.forFeedback,
       isTransient: !!target.isTransient,
@@ -99,6 +103,7 @@ export function createBridge(
       },
       destroy: () => {
         if (destroyed.has(target) || stopped) return false;
+        debugLog(`destroy scheduled for id=${id}`);
         destroyed.add(target);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           pendingDestroys.delete(sourceId);
@@ -127,6 +132,10 @@ export function createBridge(
     if (typeof emitter.connect !== "function") return;
     attachedNotifications.add(notification);
 
+    const source = (notification as { source?: unknown }).source;
+    debugLog(
+      `notification attached sourceKey=${adapter.isScreenshotSource(source) ? "screenshot" : "other"} bytes=${estimateContentBytes((notification as { gicon?: unknown }).gicon)}`,
+    );
     const signalId = emitter.connect(adapter.signals.destroy, () => {
       disposables.remove(dispose);
       onDestroyed(notification);
@@ -149,7 +158,11 @@ export function createBridge(
   ): void => {
     if (!source || typeof source !== "object" || seenSources.has(source)) return;
     seenSources.add(source);
-    if (!adapter.isScreenshotSource(source)) return;
+    const matches = adapter.isScreenshotSource(source);
+    debugLog(
+      `source title=${String((source as { title?: unknown }).title)} iconName=${String((source as { iconName?: unknown }).iconName)} screenshot=${matches}`,
+    );
+    if (!matches) return;
     const emitter = source as SignalEmitter;
     if (typeof emitter.connect !== "function") return;
 
@@ -175,7 +188,9 @@ export function createBridge(
     capabilities,
 
     start(onAdded, onDestroyed) {
+      debugLog(`bridge start sources=${tray.getSources().length}`);
       const sourceAddedId = tray.connect(adapter.signals.sourceAdded, (...args: unknown[]) => {
+        debugLog("source-added signal received");
         observeSource(args[0], onAdded, onDestroyed);
       });
       disposables.add(() => {

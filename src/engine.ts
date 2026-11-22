@@ -1,4 +1,4 @@
-import { logErr } from "./log.js";
+import { debugLog, logErr } from "./log.js";
 import { CapRule } from "./rules/cap.js";
 import { ScreenshotRule } from "./rules/screenshot.js";
 import type { Scheduler } from "./scheduler.js";
@@ -55,6 +55,7 @@ export class Engine {
 
   onNotificationAdded(notification: unknown): void {
     const sourceKey = this._bridge.sourceKeyFor(notification);
+    debugLog(`notification added sourceKey=${sourceKey}`);
     const handle = this._bridge.makeHandle(notification, sourceKey);
     if (!handle) return;
     this._handles.set(handle.id, handle);
@@ -83,6 +84,9 @@ export class Engine {
         // Rules may destroy handles, so each one sees the surviving set.
         const handles = [...this._handles.values()];
         const outcome = rule.evaluate(handles, context);
+        debugLog(
+          `rule ${rule.id}: tracked=${handles.length} destroy=${outcome.destroy.length} downgrade=${outcome.downgrade.length}`,
+        );
         for (const handle of outcome.downgrade) {
           try {
             handle.downgrade();

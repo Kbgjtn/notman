@@ -5,7 +5,7 @@ import { registerDbus } from "./src/dbus.js";
 import { Disposables } from "./src/disposables.js";
 import { Engine } from "./src/engine.js";
 import { GlibScheduler } from "./src/glib-scheduler.js";
-import { logErr } from "./src/log.js";
+import { debugLog, logErr, setDebugEnabled } from "./src/log.js";
 import { SettingsStore } from "./src/settings.js";
 import { createBridge } from "./src/shell-bridge.js";
 
@@ -29,7 +29,16 @@ export default class NotmanExtension extends Extension {
         return;
       }
 
-      const settings = new SettingsStore(this.getSettings());
+      const rawSettings = this.getSettings();
+      try {
+        setDebugEnabled(rawSettings.get_boolean("debug-logging"));
+      } catch (e) {
+        logErr(e, "notman: could not read debug-logging");
+      }
+      debugLog(
+        `enable adapter=${adapter.id} tray=${capabilities.tray} panel=${capabilities.panel}`,
+      );
+      const settings = new SettingsStore(rawSettings);
       const disposables = new Disposables();
       const bridge = createBridge(adapter, capabilities, disposables);
       if (!bridge) {
@@ -72,5 +81,6 @@ export default class NotmanExtension extends Extension {
     }
     this._engine = null;
     this._disposables = null;
+    setDebugEnabled(false);
   }
 }
