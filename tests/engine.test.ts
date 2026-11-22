@@ -204,6 +204,26 @@ describe("Engine", () => {
     expect(settings.maxCount).toBe(7);
   });
 
+  it("does not panic when settings cannot be read", () => {
+    const brokenStore = {
+      read: () => {
+        throw new Error("schema missing");
+      },
+      setNotifyEnabled: () => {},
+      setMaxCount: () => {},
+    };
+    const engine = new Engine(
+      brokenStore as never,
+      makeBridge(new Map(), new Map()),
+      "v46",
+      2,
+      new FakeScheduler(),
+    );
+
+    expect(() => engine.sweep()).not.toThrow();
+    expect(engine.getStats().activeCount).toBe(0);
+  });
+
   it("applies expiry and max-count rules across scheduled sweeps", () => {
     const now = Date.now();
     const settings = makeSettings({ expireSeconds: 10, maxCount: 1 });

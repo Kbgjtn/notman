@@ -72,26 +72,30 @@ export class Engine {
   }
 
   sweep(): void {
-    const context: RuleContext = {
-      nowMs: Date.now(),
-      settings: this._settings.read(),
-      currentlyShownId: this._bridge.currentlyShownId(),
-      log: (message) => log(`notman: ${message}`),
-    };
-    for (const rule of this._rules) {
-      // Rules may destroy handles, so each one sees the surviving set.
-      const handles = [...this._handles.values()];
-      const outcome = rule.evaluate(handles, context);
-      for (const handle of outcome.downgrade) {
-        try {
-          handle.downgrade();
-        } catch (e) {
-          logErr(e, `notman: rule ${rule.id} downgrade failed`);
+    try {
+      const context: RuleContext = {
+        nowMs: Date.now(),
+        settings: this._settings.read(),
+        currentlyShownId: this._bridge.currentlyShownId(),
+        log: (message) => log(`notman: ${message}`),
+      };
+      for (const rule of this._rules) {
+        // Rules may destroy handles, so each one sees the surviving set.
+        const handles = [...this._handles.values()];
+        const outcome = rule.evaluate(handles, context);
+        for (const handle of outcome.downgrade) {
+          try {
+            handle.downgrade();
+          } catch (e) {
+            logErr(e, `notman: rule ${rule.id} downgrade failed`);
+          }
         }
+        for (const handle of outcome.destroy) this.destroyHandle(handle);
       }
-      for (const handle of outcome.destroy) this.destroyHandle(handle);
+      this._stats.update([...this._handles.values()]);
+    } catch (e) {
+      logErr(e, "notman: sweep failed");
     }
-    this._stats.update([...this._handles.values()]);
   }
 
   private destroyHandle(handle: NotificationHandle): void {

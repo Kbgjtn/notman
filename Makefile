@@ -24,9 +24,18 @@ build: dist/extension.js
 
 dist/extension.js dist/prefs.js: $(STAMP) $(TS_SOURCES)
 	npm run build
-	cp metadata.json dist/
-	cp -R schemas dist/
-	glib-compile-schemas dist/schemas
+	@# Stage a complete tree, then swap it in atomically: a running shell must
+	@# never read a half-written compiled schema.
+	rm -rf dist.new dist.old
+	mkdir -p dist.new
+	cp dist/extension.js dist/prefs.js dist.new/
+	cp -R dist/src dist.new/ 2>/dev/null || true
+	cp metadata.json dist.new/
+	cp -R schemas dist.new/
+	glib-compile-schemas dist.new/schemas
+	@if [ -d dist ]; then mv dist dist.old; fi
+	mv dist.new dist
+	rm -rf dist.old
 
 schemas/gschemas.compiled: $(SCHEMA)
 	glib-compile-schemas --strict schemas

@@ -51,6 +51,39 @@ describe("SettingsStore", () => {
     expect(store.read().thumbnailMode).toBe("full");
   });
 
+  it("falls back to defaults and does not throw when a key is missing", () => {
+    const broken = {
+      get_boolean: () => {
+        throw new Error("missing key");
+      },
+      get_string: () => {
+        throw new Error("missing key");
+      },
+      get_int: () => {
+        throw new Error("missing key");
+      },
+      set_boolean: () => {
+        throw new Error("missing key");
+      },
+      set_int: () => {
+        throw new Error("missing key");
+      },
+    };
+    const store = new SettingsStore(broken as never);
+
+    expect(store.read()).toEqual({
+      guardEnabled: true,
+      notifyEnabled: true,
+      thumbnailMode: "full",
+      maxCount: 3,
+      expireSeconds: 15,
+      memoryBudgetMb: 64,
+      emergencyHardCap: 64,
+    });
+    expect(() => store.setNotifyEnabled(false)).not.toThrow();
+    expect(() => store.setMaxCount(1)).not.toThrow();
+  });
+
   it("writes setters back to the backend", () => {
     const settings: Record<string, unknown> = {};
     const store = new SettingsStore(fakeBackend(settings) as never);
