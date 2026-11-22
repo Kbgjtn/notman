@@ -1,4 +1,5 @@
 .notman-segmented {
+  min-width: 248px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   background-color: rgba(0, 0, 0, 0.18);
@@ -8,8 +9,9 @@
   padding: 5px 12px;
   border-radius: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.92em;
+  font-weight: 500;
   transition-duration: 120ms;
 }
 
@@ -30,7 +32,10 @@
 .notman-seg-btn:checked {
   background-color: rgba(255, 255, 255, 0.18);
   color: #ffffff;
-  font-weight: 600;
+}
+
+.notman-stats-card {
+  min-width: 248px;
 }
 
 .notman-stat-tile {
