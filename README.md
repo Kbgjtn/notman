@@ -16,8 +16,6 @@ Notman fixes GNOME Shell's screenshot & Do-Not-Disturb notification memory leaks
 
 ## Screenshots
 
-<!-- Drop your tray and Preferences screenshots into docs/tray.png and docs/prefs.png -->
-
 | Top-bar tray menu                  | Preferences                           |
 | ---------------------------------- | ------------------------------------- |
 | ![Notman tray menu](docs/tray.png) | ![Notman preferences](docs/prefs.png) |

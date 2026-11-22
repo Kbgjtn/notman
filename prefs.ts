@@ -20,7 +20,11 @@ import {
 } from "./src/settings.js";
 import { type AppRuleEntry, IndicatorPosition, ThumbnailMode } from "./src/types.js";
 
-const PREFS_CSS = `
+function buildPrefsCss(isDark: boolean): string {
+  const activeColor = isDark ? "#38bdf8" : "#0284c7";
+  const cleanedColor = isDark ? "#fbbf24" : "#d97706";
+  const savedColor = isDark ? "#34d399" : "#059669";
+  return `
 .notman-mode-frame {
   border-radius: 12px;
   border: 1px solid alpha(@window_fg_color, 0.14);
@@ -54,15 +58,16 @@ button.notman-mode-card:checked {
   border-right: none;
 }
 .notman-stat-active .notman-stat-accent {
-  color: @accent_color;
+  color: ${activeColor};
 }
 .notman-stat-cleaned .notman-stat-accent {
-  color: @warning_color;
+  color: ${cleanedColor};
 }
 .notman-stat-saved .notman-stat-accent {
-  color: @success_color;
+  color: ${savedColor};
 }
 `;
+}
 
 interface LiveStats {
   readonly activeCount: number;
@@ -119,10 +124,16 @@ export default class NotmanPreferences extends ExtensionPreferences {
     window.set_default_size(680, 720);
 
     const display = Gdk.Display.get_default();
+    const styleManager = Adw.StyleManager.get_default();
     let cssProvider: Gtk.CssProvider | null = null;
+    let styleSignalId: number | null = null;
     if (display) {
       cssProvider = new Gtk.CssProvider();
-      cssProvider.load_from_string(PREFS_CSS);
+      const applyThemeCss = (): void => {
+        cssProvider?.load_from_string(buildPrefsCss(styleManager.dark));
+      };
+      applyThemeCss();
+      styleSignalId = styleManager.connect("notify::dark", applyThemeCss);
       Gtk.StyleContext.add_provider_for_display(
         display,
         cssProvider,
@@ -1040,6 +1051,14 @@ export default class NotmanPreferences extends ExtensionPreferences {
       if (statsTimerId !== null) {
         GLib.source_remove(statsTimerId);
         statsTimerId = null;
+      }
+      if (styleSignalId !== null) {
+        try {
+          styleManager.disconnect(styleSignalId);
+        } catch {
+          // Already disconnected.
+        }
+        styleSignalId = null;
       }
       if (display && cssProvider) {
         Gtk.StyleContext.remove_provider_for_display(display, cssProvider);
