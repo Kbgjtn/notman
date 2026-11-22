@@ -424,7 +424,7 @@ export default class NotmanPreferences extends ExtensionPreferences {
     );
     aboutPage.add(advancedGroup);
 
-    const baseUrl = (this.metadata.url ?? "https://github.com/ozy/notman").replace(/\/+$/, "");
+    const baseUrl = (this.metadata.url ?? "https://github.com/Kbgjtn/notman").replace(/\/+$/, "");
     const infoGroup = new Adw.PreferencesGroup({
       title: _("Information"),
     });
