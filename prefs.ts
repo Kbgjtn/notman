@@ -13,12 +13,6 @@ import { DBUS_BUS_NAME, DBUS_OBJECT_PATH, DbusMethod } from "./src/dbus.js";
 import { parseIndicatorPosition, parseThumbnailMode, SettingKey } from "./src/settings.js";
 import { IndicatorPosition, ThumbnailMode } from "./src/types.js";
 
-const INDICATOR_POSITIONS: readonly IndicatorPosition[] = [
-  IndicatorPosition.Left,
-  IndicatorPosition.Center,
-  IndicatorPosition.Right,
-];
-
 const PREFS_CSS = `
 .notman-mode-frame {
   border-radius: 12px;
@@ -292,30 +286,47 @@ export default class NotmanPreferences extends ExtensionPreferences {
     });
     addHeaderSwitch(topBarGroup, SettingKey.ShowIndicator);
 
-    const positions = new Gtk.StringList({});
-    positions.append(_("Left"));
-    positions.append(_("Center"));
-    positions.append(_("Right"));
-    const positionRow = new Adw.ComboRow({
+    const positionRow = new Adw.ActionRow({
       title: _("Position"),
       subtitle: _("Side of the top bar."),
-      model: positions,
     });
-    const readPositionIndex = (): number => {
+    const positionBox = new Gtk.Box({
+      orientation: Gtk.Orientation.HORIZONTAL,
+      valign: Gtk.Align.CENTER,
+      css_classes: ["linked"],
+    });
+    const positionChoices: Array<{ pos: IndicatorPosition; label: string }> = [
+      { pos: IndicatorPosition.Left, label: _("Left") },
+      { pos: IndicatorPosition.Center, label: _("Center") },
+      { pos: IndicatorPosition.Right, label: _("Right") },
+    ];
+    const positionButtons = new Map<IndicatorPosition, Gtk.ToggleButton>();
+    let firstPositionButton: Gtk.ToggleButton | null = null;
+    for (const choice of positionChoices) {
+      const btn = new Gtk.ToggleButton({ label: choice.label });
+      if (firstPositionButton) {
+        btn.set_group(firstPositionButton);
+      } else {
+        firstPositionButton = btn;
+      }
+      btn.connect("toggled", () => {
+        if (btn.active) {
+          settings.set_string(SettingKey.IndicatorPosition, choice.pos);
+        }
+      });
+      positionButtons.set(choice.pos, btn);
+      positionBox.append(btn);
+    }
+    const syncPositionButtons = (): void => {
       const current = parseIndicatorPosition(settings.get_string(SettingKey.IndicatorPosition));
-      return Math.max(0, INDICATOR_POSITIONS.indexOf(current));
+      const target = positionButtons.get(current);
+      if (target && !target.active) target.active = true;
     };
-    positionRow.selected = readPositionIndex();
-    positionRow.connect("notify::selected", () => {
-      const pos = INDICATOR_POSITIONS[positionRow.selected] ?? IndicatorPosition.Right;
-      settings.set_string(SettingKey.IndicatorPosition, pos);
-    });
+    syncPositionButtons();
     signalIds.push(
-      settings.connect(`changed::${SettingKey.IndicatorPosition}`, () => {
-        const selected = readPositionIndex();
-        if (positionRow.selected !== selected) positionRow.selected = selected;
-      }),
+      settings.connect(`changed::${SettingKey.IndicatorPosition}`, syncPositionButtons),
     );
+    positionRow.add_suffix(positionBox);
     topBarGroup.add(positionRow);
 
     const indexRow = addSpin(
