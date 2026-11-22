@@ -53,6 +53,8 @@ check-imports: build
 	@! grep -R "resource:///org/gnome/shell/extensions/prefs.js" dist --include='*.js'
 	@grep -q "resource:///org/gnome/shell/extensions/extension.js" dist/extension.js
 	@grep -q "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js" dist/prefs.js
+	@echo "Checking adapter coverage for every declared shell-version..."
+	@node -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync("metadata.json","utf8"));const src=fs.readFileSync("src/compat/adapter.ts","utf8");for(const v of m["shell-version"]){if(!src.includes("SupportedMajor.V"+v)){console.error("No adapter case for GNOME",v);process.exit(1);}if(!src.includes("./v"+v+".js")||!fs.existsSync("src/compat/v"+v+".ts")){console.error("No adapter module for GNOME",v);process.exit(1);}}'
 	@echo "Import paths OK"
 
 test: $(STAMP)
@@ -73,8 +75,9 @@ check-ego: build
 	@test -f dist/LICENSE
 	@test -f dist/schemas/org.gnome.shell.extensions.notman.gschema.xml
 	@test -f dist/schemas/gschemas.compiled
-	@! grep -Eq 'gi://(Gtk|Adw|Gdk)' dist/extension.js
-	@! grep -Eq 'gi://(St|Clutter|Meta|Shell)' dist/prefs.js
+	@! find dist -name '*.js' ! -path 'dist/prefs.js' -exec grep -Eq 'gi://(Gtk|Adw|Gdk)["?]' {} +
+	@! grep -Eq 'gi://(St|Clutter|Meta|Shell)["?]' dist/prefs.js
+	@! grep -REq 'gi://(St|Clutter|Meta|Shell)["?]' dist/src/byte-estimate.js dist/src/config-io.js dist/src/dbus.js dist/src/quiet-hours.js dist/src/settings.js dist/src/types.js
 	@! grep -Rq 'imports\.mainloop' dist --include='*.js'
 	@! find dist -name '*.ts' | grep -q .
 	@echo "EGO checks OK"
