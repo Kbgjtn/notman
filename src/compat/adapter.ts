@@ -18,6 +18,7 @@ export interface ShellAdapter {
   };
   probe(): AdapterCapabilities;
   isScreenshotSource(source: unknown): boolean;
+  isScreencastSource(source: unknown): boolean;
   criticalUrgency(): number;
   dismissedReason(): number;
   getActiveNotifications(): unknown[];

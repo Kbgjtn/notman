@@ -6,6 +6,7 @@ import { type RuleSettings, ThumbnailMode } from "./types.js";
 export enum SettingKey {
   GuardEnabled = "guard-enabled",
   ScreenshotNotifyEnabled = "screenshot-notify-enabled",
+  ScreencastNotifyEnabled = "screencast-notify-enabled",
   ScreenshotThumbnailMode = "screenshot-thumbnail-mode",
   ScreenshotMaxCount = "screenshot-max-count",
   ScreenshotExpireSeconds = "screenshot-expire-seconds",
@@ -24,6 +25,7 @@ export enum SettingKey {
 const DEFAULTS: RuleSettings = {
   guardEnabled: true,
   notifyEnabled: true,
+  screencastNotifyEnabled: true,
   thumbnailMode: ThumbnailMode.Full,
   maxCount: 3,
   expireSeconds: 15,
@@ -39,6 +41,7 @@ const DEFAULTS: RuleSettings = {
 const RULE_KEYS = new Set<string>([
   SettingKey.GuardEnabled,
   SettingKey.ScreenshotNotifyEnabled,
+  SettingKey.ScreencastNotifyEnabled,
   SettingKey.ScreenshotThumbnailMode,
   SettingKey.ScreenshotMaxCount,
   SettingKey.ScreenshotExpireSeconds,
@@ -126,6 +129,10 @@ export class SettingsStore {
     const snapshot: RuleSettings = {
       guardEnabled: this.getBoolean(SettingKey.GuardEnabled, DEFAULTS.guardEnabled),
       notifyEnabled: this.getBoolean(SettingKey.ScreenshotNotifyEnabled, DEFAULTS.notifyEnabled),
+      screencastNotifyEnabled: this.getBoolean(
+        SettingKey.ScreencastNotifyEnabled,
+        DEFAULTS.screencastNotifyEnabled,
+      ),
       thumbnailMode,
       maxCount: this.getInt(SettingKey.ScreenshotMaxCount, DEFAULTS.maxCount),
       expireSeconds: this.getInt(SettingKey.ScreenshotExpireSeconds, DEFAULTS.expireSeconds),

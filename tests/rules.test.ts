@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { MiB } from "../src/byte-estimate.js";
+import { hasSourceIcon, SCREENCAST_ICON, SCREENSHOT_ICON } from "../src/compat/source-match.js";
 import { CapRule } from "../src/rules/cap.js";
 import { RetentionRule } from "../src/rules/retention.js";
+import { ScreencastRule } from "../src/rules/screencast.js";
 import { ScreenshotRule } from "../src/rules/screenshot.js";
 import { TransientRule } from "../src/rules/transient.js";
 import { SourceKey, ThumbnailMode } from "../src/types.js";
@@ -469,5 +471,62 @@ describe("RetentionRule", () => {
       makeContext(makeSettings({ globalExpireMinutes: 1, globalMaxCount: 1 }), 600_000, 3),
     );
     expect(outcome.destroy).toEqual([normal]);
+  });
+});
+
+describe("ScreencastRule", () => {
+  const rule = new ScreencastRule();
+
+  it("discards screencast notifications when screencastNotifyEnabled is false", () => {
+    const cast = new FakeHandle(1, SourceKey.Screencast, 10);
+    const shot = new FakeHandle(2, SourceKey.Screenshot, 20);
+    const other = new FakeHandle(3, SourceKey.Other, 30);
+    const outcome = rule.evaluate(
+      [cast, shot, other],
+      makeContext(makeSettings({ screencastNotifyEnabled: false })),
+    );
+    expect(outcome.destroy).toEqual([cast]);
+  });
+
+  it("does nothing when enabled or guard is off", () => {
+    const cast = new FakeHandle(1, SourceKey.Screencast, 10);
+    expect(
+      rule.evaluate([cast], makeContext(makeSettings({ screencastNotifyEnabled: true }))).destroy,
+    ).toEqual([]);
+    expect(
+      rule.evaluate(
+        [cast],
+        makeContext(makeSettings({ guardEnabled: false, screencastNotifyEnabled: false })),
+      ).destroy,
+    ).toEqual([]);
+  });
+
+  it("protects critical, feedback, and currently shown screencast notifications", () => {
+    const critical = new FakeHandle(1, SourceKey.Screencast, 10, 0, true);
+    const feedback = new FakeHandle(2, SourceKey.Screencast, 20, 0, false, true);
+    const shown = new FakeHandle(3, SourceKey.Screencast, 30);
+    const normal = new FakeHandle(4, SourceKey.Screencast, 40);
+    const outcome = rule.evaluate(
+      [critical, feedback, shown, normal],
+      makeContext(makeSettings({ screencastNotifyEnabled: false }), 1_000_000, 3),
+    );
+    expect(outcome.destroy).toEqual([normal]);
+  });
+
+  it("distinguishes screencast from screenshot sources sharing the same title", () => {
+    const screencastSource = {
+      title: "Screenshot",
+      iconName: null,
+      icon: { get_names: () => [SCREENCAST_ICON] },
+    };
+    const screenshotSource = {
+      title: "Screenshot",
+      iconName: null,
+      icon: { get_names: () => [SCREENSHOT_ICON] },
+    };
+    expect(hasSourceIcon(screencastSource, SCREENCAST_ICON)).toBe(true);
+    expect(hasSourceIcon(screencastSource, SCREENSHOT_ICON)).toBe(false);
+    expect(hasSourceIcon(screenshotSource, SCREENSHOT_ICON)).toBe(true);
+    expect(hasSourceIcon(screenshotSource, SCREENCAST_ICON)).toBe(false);
   });
 });

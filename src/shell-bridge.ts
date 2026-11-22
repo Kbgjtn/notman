@@ -131,7 +131,9 @@ export class ShellBridge implements Bridge {
   sourceKeyFor(notification: unknown): SourceKey {
     if (!notification || typeof notification !== "object") return SourceKey.Other;
     const source = (notification as { source?: unknown }).source;
-    return this._adapter.isScreenshotSource(source) ? SourceKey.Screenshot : SourceKey.Other;
+    if (this._adapter.isScreenshotSource(source)) return SourceKey.Screenshot;
+    if (this._adapter.isScreencastSource(source)) return SourceKey.Screencast;
+    return SourceKey.Other;
   }
 
   idFor(notification: unknown): number | null {

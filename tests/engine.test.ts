@@ -501,4 +501,26 @@ describe("Engine", () => {
     expect(engine.getStats().activeCount).toBe(1);
     expect(engine.getStats().prunedCount).toBe(1);
   });
+
+  it("discards screencast notifications on arrival when screencastNotifyEnabled is false", () => {
+    const cast = new FakeHandle(1, SourceKey.Screencast, 0);
+    const notification = {};
+    const bridge: Bridge = {
+      ...makeBridge(new Map([[1, cast]]), new Map([[notification, 1]])),
+      sourceKeyFor: () => SourceKey.Screencast,
+    };
+    const engine = new Engine(
+      makeSettingsStore(makeSettings({ screencastNotifyEnabled: false })),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(notification);
+
+    expect(cast.destroyed).toBe(true);
+    expect(engine.getStats().activeCount).toBe(0);
+    expect(engine.getStats().prunedCount).toBe(1);
+  });
 });

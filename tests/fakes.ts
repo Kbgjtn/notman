@@ -12,6 +12,7 @@ import {
 export interface MutableRuleSettings {
   guardEnabled: boolean;
   notifyEnabled: boolean;
+  screencastNotifyEnabled: boolean;
   thumbnailMode: ThumbnailMode;
   maxCount: number;
   expireSeconds: number;
@@ -28,6 +29,7 @@ export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRule
   return {
     guardEnabled: true,
     notifyEnabled: true,
+    screencastNotifyEnabled: true,
     thumbnailMode: ThumbnailMode.Full,
     maxCount: 0,
     expireSeconds: 0,

@@ -36,6 +36,7 @@ describe("SettingsStore", () => {
     const settings = fakeBackend({
       [SettingKey.GuardEnabled]: true,
       [SettingKey.ScreenshotNotifyEnabled]: false,
+      [SettingKey.ScreencastNotifyEnabled]: false,
       [SettingKey.ScreenshotThumbnailMode]: ThumbnailMode.TextOnly,
       [SettingKey.ScreenshotMaxCount]: 5,
       [SettingKey.ScreenshotExpireSeconds]: 30,
@@ -52,6 +53,7 @@ describe("SettingsStore", () => {
     const expected: RuleSettings = {
       guardEnabled: true,
       notifyEnabled: false,
+      screencastNotifyEnabled: false,
       thumbnailMode: ThumbnailMode.TextOnly,
       maxCount: 5,
       expireSeconds: 30,
@@ -133,6 +135,7 @@ describe("SettingsStore", () => {
     expect(store.read()).toEqual({
       guardEnabled: true,
       notifyEnabled: true,
+      screencastNotifyEnabled: true,
       thumbnailMode: ThumbnailMode.Full,
       maxCount: 3,
       expireSeconds: 15,

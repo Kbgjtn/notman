@@ -6,6 +6,7 @@ export enum ThumbnailMode {
 
 export enum SourceKey {
   Screenshot = "screenshot",
+  Screencast = "screencast",
   Other = "other",
 }
 
@@ -22,6 +23,7 @@ export interface SignalEmitter {
 export interface RuleSettings {
   readonly guardEnabled: boolean;
   readonly notifyEnabled: boolean;
+  readonly screencastNotifyEnabled: boolean;
   readonly thumbnailMode: ThumbnailMode;
   readonly maxCount: number;
   readonly expireSeconds: number;

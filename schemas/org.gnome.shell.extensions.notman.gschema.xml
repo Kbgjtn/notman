@@ -20,6 +20,15 @@
       </description>
     </key>
 
+    <key name="screencast-notify-enabled" type="b">
+      <default>true</default>
+      <summary>Allow screencast notifications</summary>
+      <description>
+        When false, screencast notifications are discarded as soon as they are
+        received.
+      </description>
+    </key>
+
     <key name="screenshot-thumbnail-mode" type="s">
       <default>'full'</default>
       <choices>

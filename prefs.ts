@@ -252,6 +252,18 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }
     page.add(rulesGroup);
 
+    const screencastGroup = new Adw.PreferencesGroup({
+      title: _("Screencast notifications"),
+    });
+    bind(SettingKey.GuardEnabled, screencastGroup, "sensitive", Gio.SettingsBindFlags.GET);
+    addSwitch(
+      screencastGroup,
+      SettingKey.ScreencastNotifyEnabled,
+      _("Allow screencast notifications"),
+      _("Turn off to discard screencast notifications immediately."),
+    );
+    page.add(screencastGroup);
+
     const transientGroup = new Adw.PreferencesGroup({
       title: _("Transient notifications"),
       description: _(

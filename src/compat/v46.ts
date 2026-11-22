@@ -2,8 +2,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as MessageTray from "resource:///org/gnome/shell/ui/messageTray.js";
 
 import type { AdapterCapabilities, ShellAdapter } from "./adapter.js";
-
-const SCREENSHOT_ICON = "screenshot-recorded-symbolic";
+import { hasSourceIcon, SCREENCAST_ICON, SCREENSHOT_ICON } from "./source-match.js";
 
 /** All shell-version-specific knowledge for GNOME 46 lives here. */
 export class V46Adapter implements ShellAdapter {
@@ -62,21 +61,10 @@ export class V46Adapter implements ShellAdapter {
   }
 
   isScreenshotSource(source: unknown): boolean {
-    if (!source || typeof source !== "object") return false;
-    // In GNOME 46, MessageTray.Source turns constructor `iconName` into a
-    // Gio.ThemedIcon on `source.icon`, leaving `source.iconName` null.
-    const candidate = source as {
-      iconName?: unknown;
-      icon?: { get_names?: () => string[] } | null;
-    };
-    if (candidate.iconName === SCREENSHOT_ICON) return true;
-    if (candidate.icon && typeof candidate.icon.get_names === "function") {
-      try {
-        return candidate.icon.get_names().includes(SCREENSHOT_ICON);
-      } catch {
-        return false;
-      }
-    }
-    return false;
+    return hasSourceIcon(source, SCREENSHOT_ICON);
+  }
+
+  isScreencastSource(source: unknown): boolean {
+    return hasSourceIcon(source, SCREENCAST_ICON);
   }
 }
