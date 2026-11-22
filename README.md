@@ -106,15 +106,23 @@ gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
 A version is added to `metadata.json` only when an adapter for it exists.
 Major-only entries (e.g. `"46"`) cover patch releases.
 
-## Baseline measurement
+## Measurement
 
 `tools/measure.sh` fires 10 `Shift+Print` screenshots on one pinned CPU under a
-60-second timeout and records gnome-shell RSS per shot into `results/baseline.csv`.
-It is deliberately bounded and must not be run unattended on a shared machine.
+60-second timeout and records gnome-shell RSS per shot in `results/baseline.csv`.
+
+`tools/benchmark.sh` repeats that for a named case and screen resolution,
+sampling both RSS and the extension's D-Bus statistics. It restores settings and
+the display mode on exit. Cases are `leak` (reference, guard off),
+`leak-dndoff` (control), `drop`, `text`, `limit`, `expire`, `budget` and `cap`.
+The DND-off case is a control only: banners add compositor noise and the
+three-entry banner queue still leaks the overflow, so it is not the comparison
+baseline. Runs must be approved before execution.
 
 ```sh
-make baseline          # only after explicit approval
-N=5 PIN_CPU=2 make baseline
+make baseline
+make benchmark CONFIRM=1 CASE=limit RES=1920x1080 RUNS=2
+make report   # writes results/report.md
 ```
 
 ## Layout
@@ -123,6 +131,6 @@ N=5 PIN_CPU=2 make baseline
 extension.ts, prefs.ts       thin compiled entry points
 src/                          bridge, compat adapters, rules, engine, UI, D-Bus
 schemas/                      GSettings schema
-tools/measure.sh              bounded baseline/benchmark harness
+tools/                        bounded baseline and case-matrix harness
 dist/                         generated, gitignored
 ```
