@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure glib-compile-schemas is available
+        run: |
+          if ! command -v glib-compile-schemas >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y libglib2.0-bin
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build, typecheck, test, lint and validate schema
+        run: make check
+
+      - name: Package the extension
+        run: make pack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notman-extension
+          path: notman.zip
+          if-no-files-found: error
