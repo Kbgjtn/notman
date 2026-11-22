@@ -64,13 +64,13 @@ export class TrayIndicator {
     const menu = this._indicator.menu;
 
     this.addSwitch(
-      _("Manage notifications"),
+      _("Enabled"),
       SettingKey.GuardEnabled,
       () => this._settings.get_boolean(SettingKey.GuardEnabled),
       (value) => this._settings.set_boolean(SettingKey.GuardEnabled, value),
     );
     this._notifyItem = this.addSwitch(
-      _("Screenshot notifications"),
+      _("Screenshots"),
       SettingKey.ScreenshotNotifyEnabled,
       () => this._settings.get_boolean(SettingKey.ScreenshotNotifyEnabled),
       (value) => this._settings.set_boolean(SettingKey.ScreenshotNotifyEnabled, value),
@@ -80,7 +80,7 @@ export class TrayIndicator {
     this._statusSeparator = new PopupMenu.PopupSeparatorMenuItem("");
     menu.addMenuItem(this._statusSeparator);
 
-    const prefsItem = new PopupMenu.PopupMenuItem(_("Preferences…"));
+    const prefsItem = new PopupMenu.PopupMenuItem(_("Settings…"));
     prefsItem.connect("activate", () => {
       try {
         openPreferences();
