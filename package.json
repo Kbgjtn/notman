@@ -14,9 +14,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
-    "@girs/gjs": "*",
-    "@girs/gnome-shell": "*",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "@girs/gjs": "^4.0.0-beta.44",
+    "@girs/gnome-shell": "^46.0.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
   }
 }

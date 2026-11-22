@@ -33,6 +33,15 @@ sources, no retention limit, no expiry, no memory budget, no thumbnail control.
 > with `export PATH=/tmp/opencode/node/bin:$PATH`. The harness in
 > `tools/measure.sh` needs no Node.
 
+## Dependencies
+
+Pinned to versions with a clean audit and no deprecation warnings: TypeScript 7,
+Vitest 5, Biome 2 and `@girs/gnome-shell` 46.x. The `@girs` packages are
+intentionally held at GNOME 46 definitions even though newer majors exist, so
+the types match the shell version in `metadata.json`. Both the 46 and 51
+releases of `@girs/gnome-shell` still declare the pre-45 prefs resource path;
+`src/types/resource-paths.d.ts` corrects it locally.
+
 ## Build and install
 
 ```sh
