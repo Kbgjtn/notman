@@ -6,15 +6,57 @@ built as a rule registry so other sources can be added later.
 
 ## Why
 
-On GNOME 46, every screenshot creates a **new** `MessageTray.Source` holding a
-full-resolution `St.ImageContent` (~33 MB at 3840x2160). The notification is
-`isTransient: true`, and GNOME only destroys transient notifications after a
-banner has been shown and hidden. With Do Not Disturb enabled, banners are
-suppressed, so those notifications are never destroyed — the list grows and the
-shell's memory climbs until the desktop buffers and lags.
+This is a measurable memory leak in GNOME Shell 46, not a problem with the
+screenshot tool or the files on disk.
 
-GNOME Settings exposes none of this: no per-source mute for shell-internal
-sources, no retention limit, no expiry, no memory budget, no thumbnail control.
+### Mechanism, verified against the GNOME 46 source
+
+1. `js/ui/screenshot.js:2313-2322` turns each capture into an `St.ImageContent`
+   holding `pixbuf.read_pixel_bytes()` at the image's full width × height in
+   RGBA8888 — about 31.6 MiB for a 3840×2160 screenshot.
+2. `js/ui/screenshot.js:2325-2366` creates a **new `MessageTray.Source` for every
+   shot**, sets that content as the notification's `gicon`, marks the
+   notification `isTransient: true`, and adds it to `Main.messageTray`.
+3. `MAX_NOTIFICATIONS_PER_SOURCE = 3` (`js/ui/messageTray.js:28`) cannot help:
+   the cap is per source, and there is one source per image, so the list is
+   effectively unbounded.
+4. The only place transient notifications are destroyed is
+   `MessageTray._hideNotificationCompleted()` (`js/ui/messageTray.js:1257-1258`),
+   which runs only after a banner has been shown and hidden.
+5. With Do Not Disturb enabled, `_onNotificationRequestBanner()` returns early
+   for non-critical notifications (`js/ui/messageTray.js:914`). No banner is ever
+   shown, so step 4 never runs and every full-size thumbnail is retained for the
+   lifetime of the shell session.
+
+### Measured proof
+
+Baseline on this machine (X11, GNOME Shell 46.0, DND on, 10 × `Shift+Print`,
+pinned to one CPU with `taskset`, bounded by `timeout 60s`):
+
+| Measurement                          | gnome-shell RSS |
+| ------------------------------------ | --------------- |
+| Before                               | 669,972 kB      |
+| After 10 screenshots                 | 1,069,800 kB    |
+| Growth                               | **+399,828 kB** |
+| Average per shot after the first one | ~45,300 kB      |
+
+Raw per-shot samples are in `results/baseline.csv`. The growth is linear in the
+number of screenshots, while only 9 files were written (same-second filename
+collisions) — disk output does not explain the memory increase.
+
+### Why GNOME Settings cannot fix it
+
+GNOME Settings gives you a Do Not Disturb switch, a lock-screen switch and a
+handful of per-application options, but none of them can stop this particular
+notification. The screenshot notification is created by the shell itself rather
+than by an installed application, so it never appears in the application list
+where you would normally mute it. Its underlying policy is hard-coded to stay
+enabled (`js/ui/messageTray.js:187-189`), and GNOME provides no setting for how
+many notifications to keep, how long to keep them, how much memory they may use
+or whether to keep the full-size thumbnail. The standard desktop notification
+bus also has no way to list or close notifications created by another program.
+Notman fills that gap by applying those rules at the exact moment the
+notification is created, before the full-size image is retained.
 
 ## Requirements
 
@@ -45,19 +87,24 @@ make dev-install # symlink dist/ into ~/.local/share/gnome-shell/extensions/
 gnome-extensions enable notman@ozy.local
 ```
 
-On X11, reload with `Alt+F2` → `r`. If the shell UI becomes unusable,
-`tools/rescue.sh` (planned) disables the extension over D-Bus without the UI.
+On X11, reload with `Alt+F2` → `r`. If the shell UI becomes unusable, the
+extension can be disabled over D-Bus without it:
+
+```sh
+gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell \
+  --method org.gnome.Shell.Extensions.DisableExtension notman@ozy.local
+```
 
 ## Compatibility
 
-| GNOME      | Status                                                           | Tier             |
-| ---------- | ---------------------------------------------------------------- | ---------------- |
-| 46         | Target, verification pending                                     | 2 (full) planned |
-| 45, 47, 48 | Upstream screenshot code confirmed similar; adapters not written | Unsupported yet  |
-| < 45       | Legacy `imports.ui.*` API, different extension lifecycle         | Out of scope     |
+| GNOME      | Adapter | Notes                                                          |
+| ---------- | ------- | -------------------------------------------------------------- |
+| 46         | `v46`   | Target; upstream notification path verified against source     |
+| 45, 47, 48 | none    | Upstream screenshot notification code is effectively identical |
+| < 45       | none    | Legacy `imports.ui.*` API, different extension lifecycle       |
 
-A version is added to `metadata.json` only after its adapter is verified in a
-real session. Major-only entries (e.g. `"46"`) cover patch releases.
+A version is added to `metadata.json` only when an adapter for it exists.
+Major-only entries (e.g. `"46"`) cover patch releases.
 
 ## Baseline measurement
 
