@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, develop]
   pull_request:
 
 permissions:
@@ -16,7 +16,7 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Ensure glib-compile-schemas is available
         run: |
@@ -25,12 +25,15 @@ jobs:
             sudo apt-get install -y libglib2.0-bin
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: "24"
           cache: npm
 
       - run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Build, typecheck, test, lint and validate schema
         run: make check
@@ -38,7 +41,7 @@ jobs:
       - name: Package the extension
         run: make pack
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: notman-extension
           path: notman.zip
