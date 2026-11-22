@@ -3,7 +3,7 @@ EXT_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SCHEMA := schemas/org.gnome.shell.extensions.notman.gschema.xml
 STAMP := node_modules/.package-lock.json
 
-TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json stylesheet.css $(shell find src -name '*.ts' -print)
+TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json stylesheet.css metadata.json LICENSE $(shell find src -name '*.ts' -print)
 
 CASE ?= leak
 RES ?=
@@ -12,10 +12,10 @@ SHOTS ?= 10
 PIN_CPU ?= 2
 TIMEOUT ?= 90
 
-.PHONY: all help build check check-schema check-imports check-scripts test lint lint-fix format dev-install install pack uninstall clean baseline benchmark report qa-xvfb
+.PHONY: all help build check check-schema check-imports check-ego check-scripts test lint lint-fix format dev-install install pack pack-ego uninstall clean baseline benchmark report qa-xvfb
 
 help:
-	@echo "Targets: build, check, lint, test, dev-install, install, pack, baseline, benchmark, report, qa-xvfb, clean"
+	@echo "Targets: build, check, check-ego, lint, test, dev-install, install, pack, pack-ego, baseline, benchmark, report, qa-xvfb, clean"
 	@echo "benchmark: CONFIRM=1 RES=WxH [CASE=leak] [RUNS=2] [SHOTS=10] [PIN_CPU=2] [TIMEOUT=90]"
 	@echo "Cases: leak, leak-dndoff, drop, compact, text, text-dndoff, limit, expire, budget, cap, combined, unlimited"
 
@@ -36,7 +36,7 @@ dist/extension.js dist/prefs.js &: $(STAMP) $(TS_SOURCES)
 	mkdir -p dist.new
 	cp dist/extension.js dist/prefs.js dist.new/
 	cp -R dist/src dist.new/ 2>/dev/null || true
-	cp metadata.json stylesheet.css dist.new/
+	cp metadata.json stylesheet.css LICENSE dist.new/
 	cp -R schemas dist.new/
 	glib-compile-schemas --strict dist.new/schemas
 	@if [ -d dist ]; then mv dist dist.old; fi
@@ -67,11 +67,23 @@ lint-fix: $(STAMP)
 format: $(STAMP)
 	npm run format
 
+check-ego: build
+	@echo "Checking extensions.gnome.org (EGO) review requirements..."
+	@node -e 'const fs=require("fs"),m=JSON.parse(fs.readFileSync("dist/metadata.json","utf8"));for(const k of["uuid","name","description","url","shell-version","settings-schema","gettext-domain"]){if(!m[k]){console.error("Missing metadata.json field:",k);process.exit(1);}}if("version"in m){console.error("metadata.json must not set version");process.exit(1);}'
+	@test -f dist/LICENSE
+	@test -f dist/schemas/org.gnome.shell.extensions.notman.gschema.xml
+	@test -f dist/schemas/gschemas.compiled
+	@! grep -Eq 'gi://(Gtk|Adw|Gdk)' dist/extension.js
+	@! grep -Eq 'gi://(St|Clutter|Meta|Shell)' dist/prefs.js
+	@! grep -Rq 'imports\.mainloop' dist --include='*.js'
+	@! find dist -name '*.ts' | grep -q .
+	@echo "EGO checks OK"
+
 check-scripts:
 	@bash -n tools/*.sh
 	@python3 -m py_compile tools/*.py
 
-check: check-schema check-imports check-scripts test lint
+check: check-schema check-imports check-ego check-scripts test lint
 	npm run check
 
 dev-install: build check-schema
@@ -83,8 +95,14 @@ dev-install: build check-schema
 	@echo "Reload shell on X11 with Alt+F2 then r"
 
 pack: build
+	@rm -f notman.zip
 	@(cd dist && zip -9r ../notman.zip .)
 	@echo "Packed: notman.zip"
+
+pack-ego: check-ego
+	@rm -f $(UUID).shell-extension.zip
+	@(cd dist && zip -9r ../$(UUID).shell-extension.zip .)
+	@echo "Packed: $(UUID).shell-extension.zip"
 
 install: pack
 	gnome-extensions install --force notman.zip
@@ -114,4 +132,4 @@ qa-xvfb: build
 	bash tools/qa-xvfb.sh
 
 clean:
-	rm -rf dist node_modules notman.zip schemas/gschemas.compiled
+	rm -rf dist node_modules notman.zip $(UUID).shell-extension.zip schemas/gschemas.compiled
