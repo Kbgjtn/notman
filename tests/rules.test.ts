@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MiB } from "../src/byte-estimate.js";
 import { hasSourceIcon, SCREENCAST_ICON, SCREENSHOT_ICON } from "../src/compat/source-match.js";
+import { BurstRule } from "../src/rules/burst.js";
 import { CapRule } from "../src/rules/cap.js";
 import { RetentionRule } from "../src/rules/retention.js";
 import { ScreencastRule } from "../src/rules/screencast.js";
@@ -528,5 +529,93 @@ describe("ScreencastRule", () => {
     expect(hasSourceIcon(screencastSource, SCREENSHOT_ICON)).toBe(false);
     expect(hasSourceIcon(screenshotSource, SCREENSHOT_ICON)).toBe(true);
     expect(hasSourceIcon(screenshotSource, SCREENCAST_ICON)).toBe(false);
+  });
+});
+
+describe("BurstRule", () => {
+  const rule = new BurstRule();
+
+  const makeAppHandle = (
+    id: number,
+    sourceId: string,
+    receivedAtMs: number,
+    isCritical = false,
+    forFeedback = false,
+  ) =>
+    new FakeHandle(
+      id,
+      SourceKey.Other,
+      receivedAtMs,
+      0,
+      isCritical,
+      forFeedback,
+      false,
+      false,
+      0,
+      false,
+      sourceId,
+    );
+
+  it("is inert when disabled or guard is off", () => {
+    const handles = [1, 2, 3, 4].map((id) => makeAppHandle(id, "slack", 1000 + id * 100));
+    expect(
+      rule.evaluate(handles, makeContext(makeSettings({ burstLimitEnabled: false }), 2000)).destroy,
+    ).toEqual([]);
+    expect(
+      rule.evaluate(
+        handles,
+        makeContext(
+          makeSettings({ guardEnabled: false, burstLimitEnabled: true, burstMaxPerSource: 1 }),
+          2000,
+        ),
+      ).destroy,
+    ).toEqual([]);
+  });
+
+  it("collapses bursts per app independently, keeping only the newest handles", () => {
+    const slack = [1, 2, 3, 4].map((id) => makeAppHandle(id, "slack", 95_000 + id * 1000));
+    const mail = [10, 11].map((id) => makeAppHandle(id, "mail", 95_000 + id * 100));
+    const outcome = rule.evaluate(
+      [...slack, ...mail],
+      makeContext(
+        makeSettings({ burstLimitEnabled: true, burstWindowSeconds: 10, burstMaxPerSource: 2 }),
+        100_000,
+      ),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([1, 2]);
+  });
+
+  it("ignores notifications older than the burst window", () => {
+    const old1 = makeAppHandle(1, "slack", 50_000);
+    const old2 = makeAppHandle(2, "slack", 60_000);
+    const recent1 = makeAppHandle(3, "slack", 98_000);
+    const recent2 = makeAppHandle(4, "slack", 99_000);
+    const outcome = rule.evaluate(
+      [old1, old2, recent1, recent2],
+      makeContext(
+        makeSettings({ burstLimitEnabled: true, burstWindowSeconds: 10, burstMaxPerSource: 2 }),
+        100_000,
+      ),
+    );
+    expect(outcome.destroy).toEqual([]);
+  });
+
+  it("never touches screenshots, critical, feedback, or currently shown notifications", () => {
+    const shot1 = new FakeHandle(1, SourceKey.Screenshot, 98_000);
+    const shot2 = new FakeHandle(2, SourceKey.Screenshot, 99_000);
+    const critical = makeAppHandle(3, "slack", 97_000, true, false);
+    const feedback = makeAppHandle(4, "slack", 97_500, false, true);
+    const shown = makeAppHandle(5, "slack", 98_000);
+    const normal1 = makeAppHandle(6, "slack", 98_500);
+    const normal2 = makeAppHandle(7, "slack", 99_000);
+    const outcome = rule.evaluate(
+      [shot1, shot2, critical, feedback, shown, normal1, normal2],
+      makeContext(
+        makeSettings({ burstLimitEnabled: true, burstWindowSeconds: 10, burstMaxPerSource: 1 }),
+        100_000,
+        5,
+      ),
+    );
+    expect(outcome.destroy.map((h) => h.id)).toEqual([6]);
   });
 });

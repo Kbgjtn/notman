@@ -558,4 +558,83 @@ describe("Engine", () => {
     engine.clearScreenshots();
     expect(engine.getStats().savedBytes).toBe(15_000_000);
   });
+
+  it("collapses per-app notification bursts via BurstRule", () => {
+    const now = Date.now();
+    const h1 = new FakeHandle(
+      1,
+      SourceKey.Other,
+      now - 2000,
+      0,
+      false,
+      false,
+      false,
+      false,
+      0,
+      false,
+      "chat",
+    );
+    const h2 = new FakeHandle(
+      2,
+      SourceKey.Other,
+      now - 1000,
+      0,
+      false,
+      false,
+      false,
+      false,
+      0,
+      false,
+      "chat",
+    );
+    const h3 = new FakeHandle(
+      3,
+      SourceKey.Other,
+      now,
+      0,
+      false,
+      false,
+      false,
+      false,
+      0,
+      false,
+      "chat",
+    );
+    const notifications = new Map<unknown, number>([
+      [{}, 1],
+      [{}, 2],
+      [{}, 3],
+    ]);
+    const [n1, n2, n3] = [...notifications.keys()];
+    const bridge: Bridge = {
+      ...makeBridge(
+        new Map([
+          [1, h1],
+          [2, h2],
+          [3, h3],
+        ]),
+        notifications,
+      ),
+      sourceKeyFor: () => SourceKey.Other,
+    };
+    const engine = new Engine(
+      makeSettingsStore(
+        makeSettings({ burstLimitEnabled: true, burstWindowSeconds: 10, burstMaxPerSource: 1 }),
+      ),
+      bridge,
+      "v46",
+      CapabilityTier.TopBar,
+      new FakeScheduler(),
+    );
+
+    engine.onNotificationAdded(n1);
+    engine.onNotificationAdded(n2);
+    engine.onNotificationAdded(n3);
+
+    expect(h1.destroyed).toBe(true);
+    expect(h2.destroyed).toBe(true);
+    expect(h3.destroyed).toBe(false);
+    expect(engine.getStats().activeCount).toBe(1);
+    expect(engine.getStats().prunedCount).toBe(2);
+  });
 });

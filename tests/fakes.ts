@@ -23,6 +23,9 @@ export interface MutableRuleSettings {
   transientDndOnly: boolean;
   globalExpireMinutes: number;
   globalMaxCount: number;
+  burstLimitEnabled: boolean;
+  burstWindowSeconds: number;
+  burstMaxPerSource: number;
 }
 
 export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRuleSettings {
@@ -40,6 +43,9 @@ export function makeSettings(overrides: Partial<RuleSettings> = {}): MutableRule
     transientDndOnly: true,
     globalExpireMinutes: 0,
     globalMaxCount: 0,
+    burstLimitEnabled: false,
+    burstWindowSeconds: 10,
+    burstMaxPerSource: 3,
     ...overrides,
   };
 }
@@ -79,6 +85,7 @@ export class FakeHandle implements NotificationHandle {
     readonly destroyThrows = false,
     compactBytes = 36_864,
     readonly compactThrows = false,
+    readonly sourceId = "app.test",
   ) {
     this._bytes = estimatedBytes;
     this._compactBytes = compactBytes;

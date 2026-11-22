@@ -570,6 +570,36 @@ export default class NotmanPreferences extends ExtensionPreferences {
     }
     retentionPage.add(transientGroup);
 
+    const burstGroup = new Adw.PreferencesGroup({
+      title: _("Burst limit"),
+      description: _("Keep only the newest alerts when an app sends a burst."),
+    });
+    bind(SettingKey.GuardEnabled, burstGroup, "sensitive", Gio.SettingsBindFlags.GET);
+    addHeaderSwitch(burstGroup, SettingKey.BurstLimitEnabled);
+
+    const burstMaxRow = addSpin(
+      burstGroup,
+      SettingKey.BurstMaxPerSource,
+      _("Max per app"),
+      _("Newest alerts kept per app during a burst."),
+      1,
+      20,
+      1,
+    );
+    const burstWindowRow = addSlider(
+      burstGroup,
+      SettingKey.BurstWindowSeconds,
+      _("Window (seconds)"),
+      _("Time window used to group a burst."),
+      2,
+      60,
+      2,
+    );
+    for (const dependentRow of [burstMaxRow, burstWindowRow]) {
+      bind(SettingKey.BurstLimitEnabled, dependentRow, "sensitive", Gio.SettingsBindFlags.GET);
+    }
+    retentionPage.add(burstGroup);
+
     const retentionGroup = new Adw.PreferencesGroup({
       title: _("All apps"),
       description: _("Applies to every app. Set 0 to disable a limit."),

@@ -40,11 +40,15 @@ export interface RuleSettings {
   readonly transientDndOnly: boolean;
   readonly globalExpireMinutes: number;
   readonly globalMaxCount: number;
+  readonly burstLimitEnabled: boolean;
+  readonly burstWindowSeconds: number;
+  readonly burstMaxPerSource: number;
 }
 
 export interface NotificationHandle {
   readonly id: number;
   readonly sourceKey: SourceKey;
+  readonly sourceId: string;
   readonly receivedAtMs: number;
   readonly estimatedBytes: number;
   readonly isCritical: boolean;

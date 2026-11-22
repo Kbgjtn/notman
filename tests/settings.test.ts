@@ -52,6 +52,9 @@ describe("SettingsStore", () => {
       [SettingKey.TransientDndOnly]: false,
       [SettingKey.GlobalExpireMinutes]: 60,
       [SettingKey.GlobalMaxCount]: 25,
+      [SettingKey.BurstLimitEnabled]: true,
+      [SettingKey.BurstWindowSeconds]: 15,
+      [SettingKey.BurstMaxPerSource]: 2,
     });
     const store = new SettingsStore(settings as never);
 
@@ -69,6 +72,9 @@ describe("SettingsStore", () => {
       transientDndOnly: false,
       globalExpireMinutes: 60,
       globalMaxCount: 25,
+      burstLimitEnabled: true,
+      burstWindowSeconds: 15,
+      burstMaxPerSource: 2,
     };
     expect(store.read()).toEqual(expected);
   });
@@ -91,7 +97,7 @@ describe("SettingsStore", () => {
     const first = store.read();
     const second = store.read();
     expect(second).toBe(first);
-    expect(backend.get_int).toHaveBeenCalledTimes(7);
+    expect(backend.get_int).toHaveBeenCalledTimes(9);
 
     // Non-rule keys should not invalidate cache or fire rule listeners.
     backend.emitChanged(SettingKey.ShowIndicator);
@@ -151,6 +157,9 @@ describe("SettingsStore", () => {
       transientDndOnly: true,
       globalExpireMinutes: 0,
       globalMaxCount: 0,
+      burstLimitEnabled: false,
+      burstWindowSeconds: 10,
+      burstMaxPerSource: 3,
     });
     expect(() => store.setGuardEnabled(false)).not.toThrow();
     expect(() => store.setNotifyEnabled(false)).not.toThrow();

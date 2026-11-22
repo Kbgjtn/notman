@@ -40,6 +40,29 @@ export interface Bridge {
   stop(): void;
 }
 
+function extractSourceId(notification: object): string {
+  const source = (notification as { source?: unknown }).source;
+  if (!source || typeof source !== "object") return "unknown";
+  const candidate = source as {
+    app?: { get_id?: () => string | null } | null;
+    policy?: { id?: string | null } | null;
+    title?: unknown;
+  };
+  try {
+    const appId = candidate.app?.get_id?.();
+    if (typeof appId === "string" && appId.length > 0) return appId;
+  } catch {
+    // Ignore custom source app implementations.
+  }
+  if (typeof candidate.policy?.id === "string" && candidate.policy.id.length > 0) {
+    return candidate.policy.id;
+  }
+  if (typeof candidate.title === "string" && candidate.title.length > 0) {
+    return candidate.title;
+  }
+  return "unknown";
+}
+
 function decodeUtf8(bytes: Uint8Array): string {
   try {
     return new TextDecoder("utf-8").decode(bytes);
@@ -177,6 +200,7 @@ export class ShellBridge implements Bridge {
     return {
       id,
       sourceKey,
+      sourceId: extractSourceId(target),
       receivedAtMs: Date.now(),
       get estimatedBytes(): number {
         if (downgraded.has(target)) return 0;

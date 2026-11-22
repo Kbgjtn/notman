@@ -17,6 +17,9 @@ export enum SettingKey {
   TransientDndOnly = "transient-dnd-only",
   GlobalExpireMinutes = "global-expire-minutes",
   GlobalMaxCount = "global-max-count",
+  BurstLimitEnabled = "burst-limit-enabled",
+  BurstWindowSeconds = "burst-window-seconds",
+  BurstMaxPerSource = "burst-max-per-source",
   ShowIndicator = "show-indicator",
   IndicatorPosition = "indicator-position",
   IndicatorIndex = "indicator-index",
@@ -38,6 +41,9 @@ const DEFAULTS: RuleSettings = {
   transientDndOnly: true,
   globalExpireMinutes: 0,
   globalMaxCount: 0,
+  burstLimitEnabled: false,
+  burstWindowSeconds: 10,
+  burstMaxPerSource: 3,
 };
 
 const RULE_KEYS = new Set<string>([
@@ -54,6 +60,9 @@ const RULE_KEYS = new Set<string>([
   SettingKey.TransientDndOnly,
   SettingKey.GlobalExpireMinutes,
   SettingKey.GlobalMaxCount,
+  SettingKey.BurstLimitEnabled,
+  SettingKey.BurstWindowSeconds,
+  SettingKey.BurstMaxPerSource,
 ]);
 
 export function parseThumbnailMode(raw: string): ThumbnailMode {
@@ -160,6 +169,9 @@ export class SettingsStore {
         DEFAULTS.globalExpireMinutes,
       ),
       globalMaxCount: this.getInt(SettingKey.GlobalMaxCount, DEFAULTS.globalMaxCount),
+      burstLimitEnabled: this.getBoolean(SettingKey.BurstLimitEnabled, DEFAULTS.burstLimitEnabled),
+      burstWindowSeconds: this.getInt(SettingKey.BurstWindowSeconds, DEFAULTS.burstWindowSeconds),
+      burstMaxPerSource: this.getInt(SettingKey.BurstMaxPerSource, DEFAULTS.burstMaxPerSource),
     };
     if (this._changedId !== null) this._cache = snapshot;
     return snapshot;

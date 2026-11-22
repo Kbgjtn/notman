@@ -134,6 +134,35 @@
       </description>
     </key>
 
+    <key name="burst-limit-enabled" type="b">
+      <default>false</default>
+      <summary>Limit per-app notification bursts</summary>
+      <description>
+        When true, collapses rapid bursts from a single app by keeping only the
+        newest burst-max-per-source notifications within burst-window-seconds.
+      </description>
+    </key>
+
+    <key name="burst-window-seconds" type="i">
+      <default>10</default>
+      <range min="2" max="60"/>
+      <summary>Burst detection window (seconds)</summary>
+      <description>
+        Sliding time window used to detect rapid notification bursts from a
+        single application.
+      </description>
+    </key>
+
+    <key name="burst-max-per-source" type="i">
+      <default>3</default>
+      <range min="1" max="20"/>
+      <summary>Maximum notifications kept per app during a burst</summary>
+      <description>
+        Number of newest notifications kept per application within the burst
+        window.
+      </description>
+    </key>
+
     <key name="show-indicator" type="b">
       <default>true</default>
       <summary>Show top-bar indicator</summary>
