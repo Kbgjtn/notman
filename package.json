@@ -6,7 +6,7 @@
   "description": "GNOME Shell extension exposing hidden notification-list policies",
   "scripts": {
     "build": "tsc",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -16,6 +16,7 @@
     "@biomejs/biome": "^2.6.8",
     "@girs/gjs": "^4.0.0-rc.17",
     "@girs/gnome-shell": "^46.0.2",
+    "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.1"
   }

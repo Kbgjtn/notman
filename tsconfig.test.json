@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["ambient.d.ts", "src/**/*.ts", "tests/**/*.ts"],
+  "files": ["extension.ts", "prefs.ts"]
+}

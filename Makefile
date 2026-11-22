@@ -3,7 +3,7 @@ EXT_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 SCHEMA := schemas/org.gnome.shell.extensions.notman.gschema.xml
 STAMP := node_modules/.package-lock.json
 
-TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json $(wildcard src/*.ts)
+TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json $(shell find src -name '*.ts' -print)
 
 .PHONY: all build check check-schema check-imports test lint lint-fix format dev-install install pack uninstall clean baseline
 
