@@ -35,48 +35,6 @@ export class V46Adapter implements ShellAdapter {
     return active;
   }
 
-  getDateMenuMenu(): unknown {
-    return (
-      (
-        Main.panel as unknown as {
-          statusArea?: { dateMenu?: { menu?: unknown } };
-        } | null
-      )?.statusArea?.dateMenu?.menu ?? null
-    );
-  }
-
-  getNotificationControlsRow(): unknown {
-    const messageList = (
-      Main.panel as unknown as {
-        statusArea?: { dateMenu?: { _messageList?: unknown } };
-      } | null
-    )?.statusArea?.dateMenu?._messageList;
-    if (!messageList || typeof messageList !== "object") return null;
-
-    const clearButton = (messageList as { _clearButton?: { get_parent?: () => unknown } })
-      ._clearButton;
-    if (clearButton && typeof clearButton.get_parent === "function") {
-      const row = clearButton.get_parent();
-      if (row) return row;
-    }
-
-    type Actor = {
-      has_style_class_name?: (name: string) => boolean;
-      get_children?: () => unknown[];
-    };
-    const find = (actor: unknown): unknown => {
-      if (!actor || typeof actor !== "object") return null;
-      const node = actor as Actor;
-      if (node.has_style_class_name?.("message-list-controls")) return actor;
-      for (const child of node.get_children?.() ?? []) {
-        const found = find(child);
-        if (found) return found;
-      }
-      return null;
-    };
-    return find(messageList);
-  }
-
   probe(): AdapterCapabilities {
     const tray = Main.messageTray as unknown as {
       getSources?: unknown;
