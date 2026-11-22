@@ -5,7 +5,14 @@ STAMP := node_modules/.package-lock.json
 
 TS_SOURCES := extension.ts prefs.ts ambient.d.ts tsconfig.json $(shell find src -name '*.ts' -print)
 
-.PHONY: all build check check-schema check-imports test lint lint-fix format dev-install install pack uninstall clean baseline
+CASE ?= leak
+RES ?=
+RUNS ?= 2
+SHOTS ?= 10
+PIN_CPU ?= 2
+TIMEOUT ?= 90
+
+.PHONY: all build check check-schema check-imports check-scripts test lint lint-fix format dev-install install pack uninstall clean baseline benchmark report
 
 all: build
 
@@ -45,7 +52,11 @@ lint-fix: $(STAMP)
 format: $(STAMP)
 	npm run format
 
-check: check-schema check-imports test lint
+check-scripts:
+	@bash -n tools/*.sh
+	@python3 -m py_compile tools/*.py
+
+check: check-schema check-imports check-scripts test lint
 	npm run check
 
 dev-install: build check-schema
@@ -70,6 +81,18 @@ uninstall:
 
 baseline:
 	bash tools/measure.sh
+
+# Bounded case matrix. Requires explicit confirmation to avoid accidental load.
+benchmark:
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "Refusing to run: set CONFIRM=1 and name CASE, RES, RUNS explicitly"; \
+		exit 1; \
+	fi
+	bash tools/benchmark.sh --case "$(CASE)" --res "$(RES)" --runs "$(RUNS)" --shots "$(SHOTS)" --pin "$(PIN_CPU)" --timeout "$(TIMEOUT)" --confirm
+
+report:
+	python3 tools/report.py > results/report.md
+	@echo "Wrote results/report.md"
 
 clean:
 	rm -rf dist node_modules notman.zip schemas/gschemas.compiled
