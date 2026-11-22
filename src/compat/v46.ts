@@ -28,8 +28,10 @@ export class V46Adapter implements ShellAdapter {
       _notification?: unknown;
       _notificationQueue?: unknown[];
     } | null;
-    const active = [...(tray?._notificationQueue ?? [])];
+    // _notification is the displayed banner; the queue holds the next ones.
+    const active: unknown[] = [];
     if (tray?._notification) active.push(tray._notification);
+    active.push(...(tray?._notificationQueue ?? []));
     return active;
   }
 

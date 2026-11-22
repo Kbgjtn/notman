@@ -123,6 +123,16 @@ describe("ScreenshotRule", () => {
     expect(outcome.destroy).toEqual([old]);
   });
 
+  it("does not over-prune for the budget when thumbnails will be downgraded", () => {
+    const handles = [1, 2, 3, 4].map((id) => new FakeHandle(id, "screenshot", id, MiB));
+    const outcome = rule.evaluate(
+      handles,
+      makeContext(makeSettings({ thumbnailMode: "text-only", memoryBudgetMb: 1 })),
+    );
+    expect(outcome.downgrade).toHaveLength(4);
+    expect(outcome.destroy).toEqual([]);
+  });
+
   it("keeps critical, feedback and currently shown notifications", () => {
     const critical = new FakeHandle(1, "screenshot", 10, 0, true);
     const feedback = new FakeHandle(2, "screenshot", 20, 0, false, true);

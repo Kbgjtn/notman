@@ -42,6 +42,7 @@ export default class NotmanExtension extends Extension {
 
       const settings = new SettingsStore(rawSettings);
       const disposables = new Disposables();
+      this._disposables = disposables;
       const bridge = createBridge(adapter, capabilities, disposables);
       if (!bridge) {
         disposables.dispose();

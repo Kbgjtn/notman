@@ -60,47 +60,59 @@ export function registerDbus(engine: Engine, disposables: Disposables): boolean 
               params: GLib.Variant,
               invocation: Gio.DBusMethodInvocation,
             ) => {
-              switch (method) {
-                case "GetStats": {
-                  const stats = engine.getStats();
-                  const dict: Record<string, GLib.Variant> = {
-                    activeCount: new GLib.Variant("i", stats.activeCount),
-                    estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
-                    peakBytes: new GLib.Variant("x", stats.peakBytes),
-                    prunedCount: new GLib.Variant("i", stats.prunedCount),
-                    shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
-                    adapterId: new GLib.Variant("s", stats.adapterId),
-                    tier: new GLib.Variant("i", stats.tier),
-                  };
-                  const result = new GLib.Variant("(a{sv})", [dict]);
-                  invocation.return_value(
-                    result as unknown as Parameters<typeof invocation.return_value>[0],
-                  );
-                  break;
+              try {
+                switch (method) {
+                  case "GetStats": {
+                    const stats = engine.getStats();
+                    const dict: Record<string, GLib.Variant> = {
+                      activeCount: new GLib.Variant("i", stats.activeCount),
+                      estimatedBytes: new GLib.Variant("x", stats.estimatedBytes),
+                      peakBytes: new GLib.Variant("x", stats.peakBytes),
+                      prunedCount: new GLib.Variant("i", stats.prunedCount),
+                      shellRssBytes: new GLib.Variant("x", stats.shellRssBytes),
+                      adapterId: new GLib.Variant("s", stats.adapterId),
+                      tier: new GLib.Variant("i", stats.tier),
+                    };
+                    const result = new GLib.Variant("(a{sv})", [dict]);
+                    invocation.return_value(
+                      result as unknown as Parameters<typeof invocation.return_value>[0],
+                    );
+                    break;
+                  }
+                  case "ClearScreenshots":
+                    engine.clearScreenshots();
+                    invocation.return_value(null);
+                    break;
+                  // SetEnabled and SetMaxCount write to GSettings, so changes
+                  // made here persist across shell restarts.
+                  case "SetEnabled": {
+                    const [enabled] = params.deepUnpack() as [boolean];
+                    engine.setEnabled(enabled);
+                    invocation.return_value(null);
+                    break;
+                  }
+                  case "SetMaxCount": {
+                    const [count] = params.deepUnpack() as [number];
+                    engine.setMaxCount(count);
+                    invocation.return_value(null);
+                    break;
+                  }
+                  default:
+                    invocation.return_dbus_error(
+                      "org.freedesktop.DBus.Error.UnknownMethod",
+                      `Unknown method: ${method}`,
+                    );
                 }
-                case "ClearScreenshots":
-                  engine.clearScreenshots();
-                  invocation.return_value(null);
-                  break;
-                // SetEnabled and SetMaxCount write to GSettings, so changes
-                // made here persist across shell restarts.
-                case "SetEnabled": {
-                  const [enabled] = params.deepUnpack() as [boolean];
-                  engine.setEnabled(enabled);
-                  invocation.return_value(null);
-                  break;
-                }
-                case "SetMaxCount": {
-                  const [count] = params.deepUnpack() as [number];
-                  engine.setMaxCount(count);
-                  invocation.return_value(null);
-                  break;
-                }
-                default:
+              } catch (e) {
+                log.err("dbus", `method ${method} failed`, e);
+                try {
                   invocation.return_dbus_error(
-                    "org.freedesktop.DBus.Error.UnknownMethod",
-                    `Unknown method: ${method}`,
+                    "org.freedesktop.DBus.Error.InvalidArgs",
+                    `Invalid arguments for ${method}`,
                   );
+                } catch {
+                  // Reply already sent.
+                }
               }
             },
             null,

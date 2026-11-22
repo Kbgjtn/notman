@@ -70,7 +70,7 @@
       <summary>Emergency hard cap on tracked notifications</summary>
       <description>
         Last-resort bound so the guard cannot be disarmed into causing the very
-        memory growth it prevents. Zero disables the cap and logs a warning.
+        memory growth it prevents. Zero disables the cap.
       </description>
     </key>
 

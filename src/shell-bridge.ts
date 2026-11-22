@@ -108,7 +108,6 @@ export function createBridge(
       destroy: () => {
         if (destroyed.has(target) || stopped) return false;
         log.debug("bridge", `destroy scheduled for id=${id}`);
-        destroyed.add(target);
         const sourceId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
           pendingDestroys.delete(sourceId);
           try {
@@ -119,6 +118,7 @@ export function createBridge(
           return GLib.SOURCE_REMOVE;
         });
         if (sourceId === 0) return false;
+        destroyed.add(target);
         pendingDestroys.add(sourceId);
         return true;
       },
@@ -173,7 +173,8 @@ export function createBridge(
     if (typeof emitter.connect !== "function") return;
 
     const signalId = emitter.connect(adapter.signals.notificationAdded, (...args: unknown[]) => {
-      attachNotification(args[0], onAdded, onDestroyed);
+      // GJS passes the emitter as args[0]; the notification is args[1].
+      attachNotification(args[1], onAdded, onDestroyed);
     });
     disposables.add(() => {
       try {
@@ -197,7 +198,8 @@ export function createBridge(
       log.debug("bridge", `start sources=${tray.getSources().length}`);
       const sourceAddedId = tray.connect(adapter.signals.sourceAdded, (...args: unknown[]) => {
         log.debug("bridge", "source-added signal received");
-        observeSource(args[0], onAdded, onDestroyed);
+        // GJS passes the emitter as args[0]; the source is args[1].
+        observeSource(args[1], onAdded, onDestroyed);
       });
       disposables.add(() => {
         try {

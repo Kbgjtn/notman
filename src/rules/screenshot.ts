@@ -50,11 +50,14 @@ export class ScreenshotRule implements Rule {
 
     if (settings.memoryBudgetMb > 0) {
       const limit = settings.memoryBudgetMb * 1024 * 1024;
-      let total = shots.reduce((sum, h) => sum + h.estimatedBytes, 0);
+      const downgrading = new Set(outcome.downgrade);
+      const bytesOf = (h: NotificationHandle): number =>
+        downgrading.has(h) ? 0 : h.estimatedBytes;
+      let total = shots.reduce((sum, h) => sum + bytesOf(h), 0);
       for (const handle of oldestFirst) {
         if (total <= limit) break;
         if (!outcome.destroy.includes(handle)) outcome.destroy.push(handle);
-        total -= handle.estimatedBytes;
+        total -= bytesOf(handle);
       }
     }
 

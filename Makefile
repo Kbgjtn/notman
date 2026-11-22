@@ -22,7 +22,8 @@ $(STAMP): package.json
 
 build: dist/extension.js
 
-dist/extension.js dist/prefs.js: $(STAMP) $(TS_SOURCES)
+dist/extension.js dist/prefs.js &: $(STAMP) $(TS_SOURCES)
+	rm -rf dist
 	npm run build
 	@# Stage a complete tree, then swap it in atomically: a running shell must
 	@# never read a half-written compiled schema.
@@ -32,6 +33,7 @@ dist/extension.js dist/prefs.js: $(STAMP) $(TS_SOURCES)
 	cp -R dist/src dist.new/ 2>/dev/null || true
 	cp metadata.json dist.new/
 	cp -R schemas dist.new/
+	@if [ -f stylesheet.css ]; then cp stylesheet.css dist.new/; fi
 	glib-compile-schemas dist.new/schemas
 	@if [ -d dist ]; then mv dist dist.old; fi
 	mv dist.new dist
